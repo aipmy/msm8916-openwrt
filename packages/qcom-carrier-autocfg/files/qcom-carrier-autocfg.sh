@@ -110,6 +110,30 @@ lookup_carrier_profile() {
 		CARRIER_IPTYPE="ipv4"
 		CARRIER_MODE="4g"
 		CARRIER_MBN="generic/common/row/gen_3gpp/mcfg_sw.mbn"
+	else
+		# Unknown / unrecognised carrier: keep what the user set.
+		# Previously we always fell through to CARRIER_APN="internet", which
+		# silently overwrote a manually-configured APN at every boot for any
+		# MCC-MNC / operator name we cannot match -- even when the user had
+		# explicitly entered a working one.  That made the engine actively
+		# harmful on travel SIMs / MVNOs / private networks whose data only
+		# exists in the user-override DB (or not at all).
+		#
+		# New behaviour: preserve the current uci setting if one exists;
+		# only fall back to "internet" for the very first boot (empty config).
+		local cur_apn
+		cur_apn=$(uci -q get network.modem.apn 2>/dev/null || echo "")
+		if [ -n "$cur_apn" ]; then
+			log "Carrier not recognised (MCC-MNC=$op_code, name='$op_name'); keeping existing APN '$cur_apn'"
+			CARRIER_APN="$cur_apn"
+		else
+			log "Carrier not recognised and no stored APN; defaulting to 'internet'"
+			CARRIER_APN="internet"
+		fi
+		CARRIER_NAME="Generic"
+		CARRIER_IPTYPE="ipv4v6"
+		CARRIER_MODE="4g"
+		CARRIER_MBN="generic/common/row/gen_3gpp/mcfg_sw.mbn"
 	fi
 }
 
