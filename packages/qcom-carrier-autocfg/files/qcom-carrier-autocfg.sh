@@ -124,10 +124,10 @@ lookup_carrier_profile() {
 		local cur_apn
 		cur_apn=$(uci -q get network.modem.apn 2>/dev/null || echo "")
 		if [ -n "$cur_apn" ]; then
-			log "Carrier not recognised (MCC-MNC=$op_code, name='$op_name'); keeping existing APN '$cur_apn'"
+			log "Carrier not recognised (MCC-MNC=$op_code, name='$op_name'); keeping existing APN '$cur_apn' — add a $CUSTOM_APN_DB entry for automatic provisioning"
 			CARRIER_APN="$cur_apn"
 		else
-			log "Carrier not recognised and no stored APN; defaulting to 'internet'"
+			log "Carrier not recognised and no stored APN; defaulting to 'internet' — add a $CUSTOM_APN_DB entry for automatic provisioning"
 			CARRIER_APN="internet"
 		fi
 		CARRIER_NAME="Generic"
