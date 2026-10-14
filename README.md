@@ -74,6 +74,10 @@ Recent additions on top of the base port:
 
 > The Wi-Fi/PMIC cooling maps are **HMU05-only** (device-tree gated). The `a2_pin` modem-rail hold is enabled on the **HMU05, UZ801 and UF02** boards — all three carry the same HiMI baseband family (`HIMI_U01_MODEM_V1.0`) exposed to the `a2_power.c:1189` quiesce wedge; `UFI001B` (modem `MPSS.DPM.2.0.2`, V2.0) and `MF800B` do not set it. Everything else applies to every board. Failsafe mode is enabled on **every board** (LED colour varies by board); it has been **live-verified on the HMU05** only.
 
+### 🛠️ Adding a new board
+
+Want to port a new MSM8916 device? See **[`Docs/ADDING_A_BOARD.md`](Docs/ADDING_A_BOARD.md)** — a step-by-step guide (DTS patch, qcom Makefile registration, `msm8916.mk` Device profile, `diffconfigs/`, base-files LED/button tweaks, build/flash/verify, and a copy/paste checklist), modelled on the [MF800B PR #2](https://github.com/akbar-npj/msm8916-openwrt/pull/2).
+
 ---
 
 ## 🔄 Recovery and Reboot Modes
