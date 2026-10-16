@@ -57,13 +57,35 @@ return view.extend({
         o.default = '1';
         o.rmempty = false;
 
-        o = s.option(form.Flag, 'mobile_optimized', _('Mobile mode (in-vehicle)'));
-        o.description = _('Enable the 30s/5s stall-detection profile for moving '
-            + 'deployments (car, travel router). Each cell handover can otherwise '
-            + 'cause up to a minute of "no internet". '
-            + 'Leave OFF for stationary use — the 60s default is Android-parity.');
+        o = s.option(form.Flag, 'auto_mobile', _('Auto mobile (detect movement)'));
+        o.description = _('Automatically switch to the 30s/5s handover-safe profile '
+            + 'when the serving cell changes (the device is moving), and revert to '
+            + 'the stationary profile after a period of stillness. Boots into the '
+            + 'stationary profile, so a parked device is unaffected. ON by default.');
+        o.default = '1';
+        o.rmempty = false;
+
+        o = s.option(form.Flag, 'mobile_optimized', _('Mobile mode (force, manual)'));
+        o.description = _('Force the 30s/5s stall-detection profile at all times '
+            + '(car, travel router) instead of auto-detecting movement. Only shown '
+            + 'when Auto mobile is OFF; with Auto mobile ON this is unnecessary.');
         o.default = '0';
         o.rmempty = false;
+        o.depends('auto_mobile', '0');
+
+        o = s.option(form.Value, 'mobile_grace_secs', _('Mobile grace (seconds)'));
+        o.datatype = 'range(30,1800)';
+        o.placeholder = '180';
+        o.depends('auto_mobile', '1');
+        o.description = _('Keep the mobile profile this long after the last detected '
+            + 'cell change before reverting to stationary.');
+
+        o = s.option(form.Value, 'cell_poll_secs', _('Cell poll (seconds)'));
+        o.datatype = 'range(5,120)';
+        o.placeholder = '15';
+        o.depends('auto_mobile', '1');
+        o.description = _('How often the watchdog samples the serving cell over '
+            + 'ModemManager D-Bus to detect movement. Read-only; never wedges the modem.');
 
         o = s.option(form.Value, 'stall_timeout', _('Stall timeout (seconds)'));
         o.datatype = 'range(30,600)';
