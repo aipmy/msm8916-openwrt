@@ -8,6 +8,18 @@
 
 ---
 
+### v25.12.5-r5 (unreleased) — built from `main`
+
+*A modem-watchdog update: automatic in-vehicle handover profile + a web UI.*
+
+**🛰️ Automatic mobility profile (new)** — The modem bearer watchdog now detects movement and adapts its stall detection automatically. With `auto_mobile` (on by default) it boots in the **stationary** profile and switches to the handover-safe **30/5** profile the moment a genuine (forward) serving-cell change is seen, reverting to stationary after `mobile_grace_secs` (180 s) of stillness — and vice versa. A boundary ping-pong between two cells is debounced so a parked device never flaps into the mobile profile. The serving cell is read over ModemManager D-Bus (`mmcli`), reusing MM's QMI client, so it never exhausts QMI ClientIds the way a `qmicli` poll loop does. A manual `mobile_optimized` force mode (always 30/5) is also available, with `cell_poll_secs` (15 s) tuning. Validated on HMU05 over a city drive.
+
+**🖥️ `luci-app-modem-watchdog` (new package)** — A LuCI web UI for the watchdog (Services → Modem Watchdog): status banner, enable/disable, the `auto_mobile` toggle + `mobile_grace_secs`/`cell_poll_secs` tuning, the manual `mobile_optimized` flag, stall-timeout/check-interval, keepalive and recovery-escalation settings. Enabled in the five board diffconfigs.
+
+**📄 Watchdog & mobility guide** — new [`Docs/Modem Stability/MODEM_BEARER_WATCHDOG.md`](Docs/Modem%20Stability/MODEM_BEARER_WATCHDOG.md) explains the `auto_mobile` profile, its config knobs, and how to tune handover behaviour.
+
+---
+
 ### v25.12.5-r4 (2026-10-10) — built from `main`
 
 *A maintenance release on top of r3: adds failsafe mode for headless dongles.*

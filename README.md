@@ -404,7 +404,7 @@ The Qualcomm baseband on these sticks can hit a **~900 s deadline** after a warm
 | :--- | :--- |
 | **`a2_pin` (HMU05, UZ801, UF02)** | Holds the A2 power rail **on** in the `qcom_bam_dmux` driver so the modem is not power-collapsed mid-handshake. Enabled via device tree on the three HiMI-baseband boards. |
 | **`himi-ok-guard`** | Rewrites the modem NV item `HiMI_OK` after **every** modem boot (cold and each SSR), so the RF task's identity check passes and the ~900 s deadline never arms. Enabled on the HMU05, UZ801 v3 and UF02 boards; writes only when the item reads all-zero (factory data is never overwritten). |
-| **`modem-bearer-watchdog`** | Watches the modem and data bearer; performs a pre-emptive subsystem restart and recovers a zombie bearer/ModemManager without a reboot. |
+| **`modem-bearer-watchdog`** | Watches the modem and data bearer; performs a pre-emptive subsystem restart and recovers a zombie bearer/ModemManager without a reboot. Automatically switches to a handover-safe **30/5 stall profile when moving** (`auto_mobile`, on by default — detects serving-cell changes over ModemManager D-Bus), reverting to the stationary profile after `mobile_grace_secs` (180 s) of stillness, and vice versa. A manual `mobile_optimized` force mode is also available. |
 | **`qcom-time-daemon`** | Anchors the modem's time base (ATS) before LTE attach so the QMI time sync is valid. |
 
 Verify the guard is active:
@@ -423,7 +423,7 @@ ubus call network.interface.modem status   # data bearer state
 | Service                  | Access Details                  | Default Credentials              |
 | :----------------------- | :------------------------------ | :------------------------------- |
 | **Web Interface (LuCI)** | `http://192.168.8.1`            | No password (set on first login) |
-| **Modem Watchdog**       | Automatic (`modem-bearer-watchdog`) | Pre-emptive SSR + zombie recovery |
+| **Modem Watchdog**       | Automatic + LuCI (Services → Modem Watchdog) | Pre-emptive SSR, zombie recovery, auto handover profile |
 | **SMS Management**       | LuCI: **Services $\to$ SMS**    | View / Send SMS via Web UI       |
 | **SSH Terminal**         | `ssh root@192.168.8.1`          | No password required             |
 | **USB Serial Console**   | `screen /dev/ttyACM0 115200`    | Direct root shell                |
@@ -547,6 +547,9 @@ apk add kmod-usb-net-rtl8152
 
 # Install WireGuard VPN
 apk add luci-app-wireguard
+
+# Install the modem bearer watchdog web UI
+apk add luci-app-modem-watchdog
 ```
 
 The packages authored and vendored in this repo (DIAG tools, carrier autoconfig,
