@@ -10,6 +10,23 @@ config watchdog 'general'
 	option check_interval '10'
 	option cooldown_seconds '60'
 
+	# --- Mobility profile (default off) ---
+	# The aggressive 30/5 stall profile avoids false stalls during the brief RX
+	# gaps that accompany a handover, but it is wasteful when stationary.  Two
+	# opt-in ways to use it:
+	#   mobile_optimized '1' -> always use 30/5 (manual; e.g. known-travelling use).
+	#   auto_mobile '1'      -> detect travel from serving-cell changes and use
+	#                            30/5 only while moving (grace window), else 60/10.
+	# Both default off; with both off the configured stall_timeout/check_interval
+	# above are used verbatim.  Cell polling is read-only over ModemManager's D-Bus
+	# (mmcli) -- it reuses MM's QMI client and never exhausts QMI ClientIds the way
+	# a qmicli poll loop does (which previously wedged the modem with
+	# ClientIdsExhausted).  See modem-bearer-watchdog sample_mobility().
+	option mobile_optimized '0'
+	option auto_mobile '0'
+	option mobile_grace_secs '180'
+	option cell_poll_secs '15'
+
 config keepalive 'keepalive'
 	# DISABLED: stock Android has no DNS keepalive.  It relies on the modem's
 	# own DRX/paging and on DcTracker's indication-driven dormancy state

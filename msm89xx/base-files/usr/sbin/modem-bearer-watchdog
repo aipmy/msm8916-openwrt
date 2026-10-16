@@ -30,6 +30,29 @@ KEEPALIVE_ENABLED=1
 KEEPALIVE_INTERVAL=120
 KEEPALIVE_TARGET="openwrt.org"
 
+# --- Mobility profile (default off; opt-in via auto_mobile / mobile_optimized). ---
+#
+# When travelling, serving cells change frequently; the aggressive 30/5 stall
+# profile avoids declaring a stall on the brief RX gaps that accompany a
+# handover.  The detector watches the serving cell over D-Bus (mmcli, which
+# reuses ModemManager's own QMI client -- never a qmicli poll loop, which
+# previously exhausted QMI ClientIds and wedged the modem) and, on a genuine
+# *forward* cell change, holds the mobile profile for mobile_grace_secs.  A
+# ping-pong between two cells on a boundary is debounced so a parked device
+# does not flap into the mobile profile.  Reverting to stationary only LENGTHENS
+# stall_timeout (more patient), so the transition can never precipitate a
+# teardown it would not have taken anyway.
+MOBILE_OPTIMIZED=0
+AUTO_MOBILE=0
+MOBILE_GRACE_SECS=180
+CELL_POLL_SECS=15
+CELL_KEY=""          # current serving cell key (PLMN:area:cell-id)
+CELL_PREV=""         # the cell immediately before the current one
+MOBILE_ACTIVE=0      # 1 while the grace window is open
+MOBILE_EXPIRE=0      # epoch second at which the grace window closes
+LAST_CELL_POLL=0     # epoch second of the last mmcli sample
+LAST_EFFECTIVE_PROFILE=""  # for logging profile transitions
+
 LAST_TX=0
 LAST_RX=0
 STALL_COUNT=0
@@ -119,7 +142,62 @@ verify_rx_connectivity() {
     return 1
 }
 
-# --- Modem subsystem restart ---------------------------------------------------
+# --- Mobility detection -------------------------------------------------------
+#
+# Build a stable per-serving-cell key from ModemManager's 3GPP location info,
+# read over D-Bus (no GPS, no qmicli poll).  Returns 0 and prints the key on
+# stdout, 1 if the cell cannot be read.  PLMN + area code (TAC for LTE, LAC for
+# 2G/3G) + cell id is globally unique within a PLMN, so it is a safe change
+# signal.  This is the proven method from the 80-minute drive probe
+# (/tmp/handover_probe3.sh): 192 handovers across JIO with zero stalls.
+get_serving_cell_key() {
+    local loc ci lac tac mcc mnc area key
+    loc=$(mmcli -m any --location-get 2>/dev/null) || return 1
+    ci=$(printf '%s\n' "$loc"   | sed -n "s/.*cell id: *\([0-9A-Fa-f]*\).*/\1/p" | head -1)
+    lac=$(printf '%s\n' "$loc"   | sed -n "s/.*location area code: *\([0-9A-Fa-f]*\).*/\1/p" | head -1)
+    tac=$(printf '%s\n' "$loc"   | sed -n "s/.*tracking area code: *\([0-9A-Fa-f]*\).*/\1/p" | head -1)
+    mcc=$(printf '%s\n' "$loc"   | sed -n "s/.*operator mcc: *\([0-9]*\).*/\1/p" | head -1)
+    mnc=$(printf '%s\n' "$loc"   | sed -n "s/.*operator mnc: *\([0-9]*\).*/\1/p" | head -1)
+    [ -z "$ci" ] && return 1
+    area="${tac:-$lac}"
+    key="${mcc}${mnc}:${area}:${ci}"
+    printf '%s' "$key"
+}
+
+# Throttled to CELL_POLL_SECS.  Updates CELL_KEY/CELL_PREV and the
+# MOBILE_ACTIVE/MOBILE_EXPIRE state.  Safe to call every loop iteration.
+sample_mobility() {
+    local now key
+    now=$(date +%s)
+    [ $((now - LAST_CELL_POLL)) -lt "$CELL_POLL_SECS" ] && return 0
+    LAST_CELL_POLL="$now"
+
+    key=$(get_serving_cell_key) || return 0
+    [ -z "$key" ] && return 0
+
+    if [ -n "$CELL_KEY" ] && [ "$key" != "$CELL_KEY" ]; then
+        # A distinct new cell appeared.  Ping-pong debounce: a device parked on
+        # a boundary bouncing between exactly two cells must NOT toggle the
+        # mobile profile.  A return to CELL_PREV is that bounce; only a third,
+        # genuinely different cell counts as forward movement.  The very first
+        # distinct transition (CELL_PREV still empty) is also suppressed so a
+        # startup re-acquisition cannot trip it.
+        if [ -n "$CELL_PREV" ] && [ "$key" != "$CELL_PREV" ]; then
+            if [ "$MOBILE_ACTIVE" != "1" ]; then
+                logger -t modem-stall-watchdog "MOBILITY: forward cell change (${CELL_KEY} -> ${key}); entering mobile profile for ${MOBILE_GRACE_SECS}s"
+            fi
+            MOBILE_ACTIVE=1
+            MOBILE_EXPIRE=$((now + MOBILE_GRACE_SECS))
+        fi
+        CELL_PREV="$CELL_KEY"
+    fi
+    CELL_KEY="$key"
+
+    if [ "$MOBILE_ACTIVE" = "1" ] && [ "$now" -ge "$MOBILE_EXPIRE" ]; then
+        logger -t modem-stall-watchdog "MOBILITY: no forward cell change for ${MOBILE_GRACE_SECS}s; reverting to stationary profile"
+        MOBILE_ACTIVE=0
+    fi
+}
 #
 # Android-parity clean-restart node (kernel patch 826).  Writing the literal
 # string "restart" runs the stop -> power-up pair on the system workqueue and
@@ -193,6 +271,10 @@ while true; do
     KEEPALIVE_TARGET=$(uci -q get modem-watchdog.keepalive.target || echo "1.1.1.1")
     BEARER_DOWN_RECOVER_SECS=$(uci -q get modem-watchdog.recovery.bearer_down_recover_secs || echo 30)
     ZOMBIE_NUDGE_SECS=$(uci -q get modem-watchdog.recovery.zombie_nudge_secs || echo 60)
+    MOBILE_OPTIMIZED=$(uci -q get modem-watchdog.general.mobile_optimized || echo 0)
+    AUTO_MOBILE=$(uci -q get modem-watchdog.general.auto_mobile || echo 0)
+    MOBILE_GRACE_SECS=$(uci -q get modem-watchdog.general.mobile_grace_secs || echo 180)
+    CELL_POLL_SECS=$(uci -q get modem-watchdog.general.cell_poll_secs || echo 15)
 
     # 1. Check if modem remoteproc is running
     RPROC=$(cat "$RPROC_STATE" 2>/dev/null)
@@ -200,6 +282,34 @@ while true; do
         STALL_COUNT=0
         sleep "$CHECK_INTERVAL"
         continue
+    fi
+
+    # 1b. Resolve the effective stall profile.  Precedence:
+    #       mobile_optimized=1  -> forced aggressive 30/5 (manual opt-in);
+    #       auto_mobile=1       -> detector: moving -> 30/5, else config 60/10;
+    #       else                -> the configured stall_timeout/check_interval.
+    #   sample_mobility() is throttled to CELL_POLL_SECS, so calling it every
+    #   loop is cheap.  A profile change resets STALL_COUNT so a switch never
+    #   carries a half-accumulated count across the different thresholds.
+    EFFECTIVE_PROFILE="config"
+    if [ "$MOBILE_OPTIMIZED" = "1" ]; then
+        STALL_TIMEOUT=30
+        CHECK_INTERVAL=5
+        EFFECTIVE_PROFILE="mobile-forced"
+    elif [ "$AUTO_MOBILE" = "1" ]; then
+        sample_mobility
+        if [ "$MOBILE_ACTIVE" = "1" ]; then
+            STALL_TIMEOUT=30
+            CHECK_INTERVAL=5
+            EFFECTIVE_PROFILE="mobile-detected"
+        else
+            EFFECTIVE_PROFILE="stationary-detected"
+        fi
+    fi
+    if [ "$EFFECTIVE_PROFILE" != "$LAST_EFFECTIVE_PROFILE" ]; then
+        logger -t modem-stall-watchdog "PROFILE: ${LAST_EFFECTIVE_PROFILE:-none} -> ${EFFECTIVE_PROFILE} (stall_timeout=${STALL_TIMEOUT}s, check_interval=${CHECK_INTERVAL}s)"
+        STALL_COUNT=0
+        LAST_EFFECTIVE_PROFILE="$EFFECTIVE_PROFILE"
     fi
 
     # 1a. Fatal observer.  Count the modem's own "fatal error received" lines and
