@@ -105,7 +105,7 @@ Notes:
 - **Button did nothing?** The 7-second window starts during preinit, not
   at power-on. HMU05's button-driven failsafe flow is verified.
   UZ801's button response and idle level are verified, but its failsafe flow is
-  not working yet. UFI001B, UF02 and MF800B buttons are declared active-high/pull-down but not yet confirmed on hardware —
+  not working yet. UFI001B, UFI003, UF02 and MF800B buttons are declared active-high/pull-down but not yet confirmed on hardware —
   if yours does nothing, use the serial `f` key instead and report it.
 - **Everything is dead?** Fall back to EDL (section 3).
 
@@ -164,17 +164,19 @@ Then use the flashing tooling in [`Docs/EDL/`](../EDL/) and the project
 
 > ⚠ **The button's polarity and bias must match the hardware, or the button is
 > completely inert** (no edge ever reaches the driver, so no uevent, so no
-> failsafe). All five boards are now declared **`GPIO_ACTIVE_HIGH` +
-> `bias-pull-down`** (idle low, press = high), matching the verified HMU05
-> behaviour: its pinhole Restart button pulls GPIO37 **up to VCC** when pressed,
-> and the stock HMU05 Android DTS agrees (`key_freset`, flags `0x00`). The
-> earlier active-low/pull-up declarations made GPIO37 idle high, so a press
-> produced no edge.
+> failsafe). The verified HMU05 behaviour is **`GPIO_ACTIVE_HIGH` +
+> `bias-pull-down`** (idle low, press = high): its pinhole Restart button pulls
+> GPIO37 **up to VCC** when pressed, and the stock HMU05 Android DTS agrees
+> (`key_freset`, flags `0x00`). The earlier active-low/pull-up declaration made
+> GPIO37 idle high, so a press produced no edge.
 >
-> **Only HMU05 is verified live so far (2026-10-10).** The other four boards
-> were switched to the same active-high/pull-down configuration by request: if a
-> board's button turns out to be wired active-low, the fix is to revert that
-> board's patch (`GPIO_ACTIVE_HIGH` → `GPIO_ACTIVE_LOW`, `bias-pull-down` →
+> **Only HMU05 is verified live (2026-10-10).** UFI001B, UFI003, UF02 and
+> MF800B are declared active-high/pull-down but unverified. **UZ801 is the
+> exception — it is active-low/pull-up**: GPIO23 idles high, so an active-high
+> declaration made the driver read the button as permanently pressed and a
+> short press triggered a factory reset; reverted 2026-10-16 (PR #11). If a
+> board's button turns out to be wired the other way, the fix is to revert that
+> board's patch (`GPIO_ACTIVE_HIGH` ↔ `GPIO_ACTIVE_LOW`, `bias-pull-down` ↔
 > `bias-pull-up`) and report it. If a button does nothing, check the `bias` and
 > polarity against the board's stock DTS.
 
