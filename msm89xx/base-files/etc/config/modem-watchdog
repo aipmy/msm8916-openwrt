@@ -10,20 +10,25 @@ config watchdog 'general'
 	option check_interval '10'
 	option cooldown_seconds '60'
 
-	# --- Mobility profile (default off) ---
+	# --- Mobility profile (auto_mobile ON by default) ---
 	# The aggressive 30/5 stall profile avoids false stalls during the brief RX
-	# gaps that accompany a handover, but it is wasteful when stationary.  Two
-	# opt-in ways to use it:
+	# gaps that accompany a handover, but it is wasteful when stationary.
 	#   mobile_optimized '1' -> always use 30/5 (manual; e.g. known-travelling use).
-	#   auto_mobile '1'      -> detect travel from serving-cell changes and use
-	#                            30/5 only while moving (grace window), else 60/10.
-	# Both default off; with both off the configured stall_timeout/check_interval
-	# above are used verbatim.  Cell polling is read-only over ModemManager's D-Bus
-	# (mmcli) -- it reuses MM's QMI client and never exhausts QMI ClientIds the way
-	# a qmicli poll loop does (which previously wedged the modem with
-	# ClientIdsExhausted).  See modem-bearer-watchdog sample_mobility().
+	#   auto_mobile      '1' -> AUTOMATIC: the watchdog starts in the STATIONARY
+	#                            profile and switches to 30/5 the instant a genuine
+	#                            (forward) serving-cell change indicates movement,
+	#                            reverting to the stationary profile after
+	#                            mobile_grace_secs of stillness -- and vice versa.
+	# auto_mobile defaults ON so every device gets handover-safe stall detection
+	# with no manual setup; a parked device simply stays in the stationary profile
+	# and sees no change.  Set auto_mobile '0' to disable detection and use the
+	# configured stall_timeout/check_interval above verbatim.  Cell polling is
+	# read-only over ModemManager's D-Bus (mmcli) -- it reuses MM's QMI client and
+	# never exhausts QMI ClientIds the way a qmicli poll loop does (which previously
+	# wedged the modem with ClientIdsExhausted).  See modem-bearer-watchdog
+	# sample_mobility().
 	option mobile_optimized '0'
-	option auto_mobile '0'
+	option auto_mobile '1'
 	option mobile_grace_secs '180'
 	option cell_poll_secs '15'
 

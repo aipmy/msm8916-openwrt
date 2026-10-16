@@ -30,7 +30,7 @@ KEEPALIVE_ENABLED=1
 KEEPALIVE_INTERVAL=120
 KEEPALIVE_TARGET="openwrt.org"
 
-# --- Mobility profile (default off; opt-in via auto_mobile / mobile_optimized). ---
+# --- Mobility profile (auto_mobile ON by default; starts stationary, auto-detects movement). ---
 #
 # When travelling, serving cells change frequently; the aggressive 30/5 stall
 # profile avoids declaring a stall on the brief RX gaps that accompany a
