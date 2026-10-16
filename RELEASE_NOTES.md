@@ -8,15 +8,23 @@
 
 ---
 
-### v25.12.5-r5 (unreleased) — built from `main`
+### v25.12.5-r5 (2026-10-16) — built from `main`
 
 *A modem-watchdog update: automatic in-vehicle handover profile + a web UI.*
 
-**🛰️ Automatic mobility profile (new)** — The modem bearer watchdog now detects movement and adapts its stall detection automatically. With `auto_mobile` (on by default) it boots in the **stationary** profile and switches to the handover-safe **30/5** profile the moment a genuine (forward) serving-cell change is seen, reverting to stationary after `mobile_grace_secs` (180 s) of stillness — and vice versa. A boundary ping-pong between two cells is debounced so a parked device never flaps into the mobile profile. The serving cell is read over ModemManager D-Bus (`mmcli`), reusing MM's QMI client, so it never exhausts QMI ClientIds the way a `qmicli` poll loop does. A manual `mobile_optimized` force mode (always 30/5) is also available, with `cell_poll_secs` (15 s) tuning. Validated on HMU05 over a city drive.
+**Why this release** — The headline is **automatic mobility**: the modem bearer watchdog now detects when the device is moving and switches to a handover-safe stall profile on its own, so a dongle used in a car no longer drops to "no internet" for a full minute at every cell change. A **LuCI web UI** for the watchdog ships alongside it (enabled on all five board images).
 
-**🖥️ `luci-app-modem-watchdog` (new package)** — A LuCI web UI for the watchdog (Services → Modem Watchdog): status banner, enable/disable, the `auto_mobile` toggle + `mobile_grace_secs`/`cell_poll_secs` tuning, the manual `mobile_optimized` flag, stall-timeout/check-interval, keepalive and recovery-escalation settings. Enabled in the five board diffconfigs.
+**🛰️ Automatic mobility profile (new)** — With `auto_mobile` (on by default) the watchdog boots in the **stationary** profile and switches to the handover-safe **30/5** profile the moment a genuine (forward) serving-cell change is seen, reverting to stationary after `mobile_grace_secs` (180 s) of stillness — and vice versa. A boundary ping-pong between two cells is debounced so a parked device never flaps into the mobile profile. The serving cell is read over ModemManager D-Bus (`mmcli`), reusing MM's QMI client, so it never exhausts QMI ClientIds the way a `qmicli` poll loop does. A manual `mobile_optimized` force mode (always 30/5) is also available, with `cell_poll_secs` (15 s) tuning.
+
+**🖥️ `luci-app-modem-watchdog` (new package)** — A LuCI web UI for the watchdog (**Services → Modem Watchdog**): status banner, enable/disable, the `auto_mobile` toggle + `mobile_grace_secs`/`cell_poll_secs` tuning, the manual `mobile_optimized` flag, stall-timeout/check-interval, keepalive and recovery-escalation settings. Enabled in the five board diffconfigs.
 
 **📄 Watchdog & mobility guide** — new [`Docs/Modem Stability/MODEM_BEARER_WATCHDOG.md`](Docs/Modem%20Stability/MODEM_BEARER_WATCHDOG.md) explains the `auto_mobile` profile, its config knobs, and how to tune handover behaviour.
+
+**🧪 Tested only on HMU05 — your testing is needed** — The mobility profile and the LuCI app were validated **only on the HMU05** (a ~20-minute city drive, zero spurious stalls). The other boards (`ufi001b`, `uz801` v3, `uf02`, `mf800b`, `ufi003`) compile from the same tree but have **not** been drive-tested on this release. If you run one of them — or any setup different from the default — please flash it and **report back**: which board, what you exercised (boot, Wi-Fi, Bluetooth, modem attach + data, a drive test), and the result. Positive confirmations are as useful as failures — please open an issue.
+
+**⬆️ Upgrading** — From r4: `sysupgrade` (keep config) is fine and preserves the overlay. The new watchdog options default sensibly, so an existing `modem-watchdog` config carries over unchanged.
+
+**⚠️ Known issues** — See r4 below (overlay module shadowing; `sysupgrade -n` wipes the modem firmware; STA+AP Wi-Fi crashes the WCNSS firmware).
 
 ---
 
