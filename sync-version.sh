@@ -27,11 +27,11 @@ fi
 BASE="${VER%-r*}"
 REL="${VER##*-}"
 
-BLOCK=$(printf 'CONFIG_VERSION_DIST="msm8916-openwrt"\nCONFIG_VERSION_NUMBER="%s"\nCONFIG_VERSION_CODE="%s"\nCONFIG_VERSION_REPO="https://akbar-npj.github.io/msm8916-openwrt/releases/%s/packages"\nCONFIG_VERSION_HOME="https://github.com/akbar-npj/msm8916-openwrt"\nCONFIG_VERSION_BUG_URL="https://github.com/akbar-npj/msm8916-openwrt/issues"' "$VER" "$REL" "$BASE")
+BLOCK=$(printf 'CONFIG_VERSIONOPT=y\nCONFIG_VERSION_FILENAMES=n\nCONFIG_VERSION_DIST="msm8916-openwrt"\nCONFIG_VERSION_NUMBER="%s"\nCONFIG_VERSION_CODE="%s"\nCONFIG_VERSION_REPO="https://akbar-npj.github.io/msm8916-openwrt/releases/%s/packages"\nCONFIG_VERSION_HOME_URL="https://github.com/akbar-npj/msm8916-openwrt"\nCONFIG_VERSION_BUG_URL="https://github.com/akbar-npj/msm8916-openwrt/issues"' "$VER" "$REL" "$BASE")
 
 for f in "$REPO_DIR"/diffconfigs/*; do
   [ -f "$f" ] || continue
-  grep -v '^CONFIG_VERSION_' "$f" > "$f.tmp"
+  grep -vE '^CONFIG_VERSION(_|OPT)' "$f" > "$f.tmp"
   mv "$f.tmp" "$f"
   printf '\n%s\n' "$BLOCK" >> "$f"
 done
