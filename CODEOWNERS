@@ -1,0 +1,23 @@
+# Per-board maintainers for msm8916-openwrt
+# ----------------------------------------
+# The `main` branch is protected. All changes land via Pull Request + review.
+# Maintainers get Write access so they can push branches and self-merge their
+# own board PRs after review, but they cannot push directly to `main`.
+#
+# The lead (@akbar-npj) owns the shared build pipeline, the device table
+# (msm89xx/image/msm8916.mk), and every board-independent patch.
+# Board-specific device-tree patches and diffconfigs are owned by the hardware
+# owner listed below.
+
+# --- UZ801 (maintained by @isprogrammer) ---
+msm89xx/patches/803-arm64-dts-qcom-uz801-leds-and-button.patch  @isprogrammer
+msm89xx/patches/851-arm64-dts-qcom-uf02-uz801-a2-pin.patch      @isprogrammer @akbar-npj
+msm89xx/image/msm8916.mk                                        @akbar-npj
+
+# --- UFI003 (maintained by @isprogrammer) ---
+msm89xx/patches/852-arm64-dts-qcom-add-msm8916-generic-ufi003.patch  @isprogrammer
+diffconfigs/ufi003                                               @isprogrammer
+
+# --- UZ801 config + everything else defaults to the lead ---
+diffconfigs/uz801  @isprogrammer
+*  @akbar-npj

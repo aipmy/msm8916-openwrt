@@ -1,5 +1,5 @@
 --- /dev/null
-+++ b/arch/arm64/boot/dts/qcom/msm8916-generic-hmu05.dts
++++ b/arch/arm64/boot/dts/qcom/msm8916-generic-hmuf02v5.dts
 @@ -0,0 +1,227 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
@@ -11,8 +11,8 @@
 +#include <dt-bindings/leds/common.h>
 +
 +/ {
-+    model = "HMU05 4G Modem Stick";
-+    compatible = "hmu05,250605v0s", "qcom,msm8916";
++    model = "HMUF02-V5 4G Modem Stick";
++    compatible = "hmuf02v5,250605v0s", "qcom,msm8916";
 +};
 +
 +/*
@@ -32,7 +32,7 @@
 +};
 +
 +/*
-+ * HMU05 reset button
++ * HMUF02-V5 reset button
 + *
 + * Original Android firmware:
 + *
@@ -45,7 +45,7 @@
 + * With the internal pull-up the pin idles high and a press produces
 + * no edge (so no uevent); the correct configuration is an internal
 + * pull-down (idle low) with an active-high level (press = high).
-+ * Verified live on the HMU05: with bias-pull-down every press/release
++ * Verified live on the HMUF02-V5: with bias-pull-down every press/release
 + * toggles the pin 0->1->0 and raises IRQ 40.
 + */
 +&button_restart {
@@ -58,7 +58,7 @@
 +};
 +
 +/*
-+ * HMU05 LEDs
++ * HMUF02-V5 LEDs
 + *
 + * Original Android GPIO mapping:
 + *
@@ -66,7 +66,7 @@
 + *   GPIO72 = 4g_type
 + *   GPIO73 = wifistatus
 + *
-+ * Physical LEDs identified on HMU05:
++ * Physical LEDs identified on HMUF02-V5:
 + *
 + *   GPIO71 = GREEN
 + *   GPIO72 = RED
@@ -129,7 +129,7 @@
 +};
 +
 +/*
-+ * HMU05 board-specific GPIO initialization
++ * HMUF02-V5 board-specific GPIO initialization
 + *
 + * These GPIO states were recovered from the original Android
 + * firmware and verified against the running Android system.

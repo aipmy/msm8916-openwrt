@@ -54,9 +54,9 @@ jobs:
             openwrt/dl
             openwrt/staging_dir/toolchain-aarch64_generic_gcc-14.3.0_musl
             openwrt/staging_dir/host
-          key: openwrt-cache-${{ steps.vars.outputs.version }}-${{ hashFiles('openwrt/feeds.conf.default', 'diffconfigs/hmu05') }}-${{ github.run_id }}
+          key: openwrt-cache-${{ steps.vars.outputs.version }}-${{ hashFiles('openwrt/feeds.conf.default', 'diffconfigs/hmuf02v5') }}-${{ github.run_id }}
           restore-keys: |
-            openwrt-cache-${{ steps.vars.outputs.version }}-${{ hashFiles('openwrt/feeds.conf.default', 'diffconfigs/hmu05') }}-
+            openwrt-cache-${{ steps.vars.outputs.version }}-${{ hashFiles('openwrt/feeds.conf.default', 'diffconfigs/hmuf02v5') }}-
             openwrt-cache-${{ steps.vars.outputs.version }}-
             openwrt-cache-
 
@@ -75,7 +75,7 @@ jobs:
           printf '%s\n' "$APK_SIGNING_KEY" > openwrt/private-key.pem
           echo "Injected persistent private signing key."
 
-      - name: Compile All Firmware Images (hmu05, ufi001b, uz801, uf02, mf800b)
+      - name: Compile All Firmware Images (hmuf02v5, ufi001b, uz801, uf02, mf800b)
         run: |
           ./build.sh build all
 

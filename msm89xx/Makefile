@@ -46,9 +46,9 @@ DEFAULT_PACKAGES += bt-ssp-guard
 # bluetoothd --compat for the local SDP socket (see the openwrt-overlay
 # bluetoothd.init override).
 DEFAULT_PACKAGES += bt-spp
-# qcom-time-daemon is HMU05-only: its init gates on the board name (returns 0 on
+# qcom-time-daemon is HMUF02-V5-only: its init gates on the board name (returns 0 on
 # any non-HMU05 board) and it only exists to anchor the HMU05 modem's ATS state.
-# It is pulled in by the generic-hmu05 DEVICE_PACKAGES, not as a default.
+# It is pulled in by the generic-hmuf02v5 DEVICE_PACKAGES, not as a default.
 DEFAULT_PACKAGES += rmtfs qcom-carrier-autocfg
 # Interactive/debug helpers wanted on every board: `stty` (terminal control,
 # e.g. for the serial console) and `xxd` (hex dumps).

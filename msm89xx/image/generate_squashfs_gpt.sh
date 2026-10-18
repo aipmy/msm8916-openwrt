@@ -6,7 +6,7 @@
 # The eMMC size differs between devices, so the total sector count is taken
 # from the TOT_SECTORS environment variable (set per device via
 # GPT_TOT_SECTORS in msm8916.mk); it defaults to the 4 GB part fitted to the
-# hmu05 / uf02 / ufi001b / uz801 sticks.
+# hmuf02v5 / uf02 / ufi001b / uz801 sticks.
 #
 # To read TOT_SECTORS from a live device:
 #   HEX=$(edl printgpt 2>&1 | sed -n 's/.*sectors:\(0x[0-9A-Fa-f]\+\).*/\1/p' | tail -n1)

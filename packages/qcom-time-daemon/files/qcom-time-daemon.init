@@ -13,7 +13,7 @@ start_service() {
 	[ -f /tmp/sysinfo/board_name ] && board="$(cat /tmp/sysinfo/board_name 2>/dev/null)"
 	[ -z "$board" ] && [ -f /proc/device-tree/compatible ] && board="$(cat /proc/device-tree/compatible 2>/dev/null)"
 	case "$board" in
-		*hmu05*|*HMU05*) ;;
+		*hmu05*|*HMUF02-V5*|*hmuf02v5*) ;;
 		*) return 0 ;;
 	esac
 

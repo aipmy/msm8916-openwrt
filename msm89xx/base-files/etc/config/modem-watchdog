@@ -68,10 +68,10 @@ config recovery 'recovery'
 
 	# NOTE: the pre-emptive SSR (preemptive_ssr_enabled / preemptive_ssr_interval)
 	# and the himi_ok_* keys are GONE.  The pre-emptive SSR existed only to defer
-	# the ~900 s lte_ml1 fatal; the root-cause fix is the HMU05-only HiMI_OK guard
-	# (a separate, HMU05-gated service).
+	# the ~900 s lte_ml1 fatal; the root-cause fix is the HMUF02-V5-only HiMI_OK guard
+	# (a separate, HMUF02-V5-gated service).
 	#
-	# The A2 pin now lives in the DRIVER (kernel patch 848).  The HMU05 board
+	# The A2 pin now lives in the DRIVER (kernel patch 848).  The HMUF02-V5 board
 	# DTS sets "qcom,a2-pin" on &bam_dmux, so bam_dmux_probe() calls
 	# pm_runtime_forbid() (== power/control=on) and the A2 never powers down.
 	# There is no userspace holder any more; the runtime knob is the module

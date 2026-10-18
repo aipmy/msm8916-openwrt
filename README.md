@@ -20,7 +20,7 @@ Recent additions on top of the base port:
 * **🆘 Failsafe mode** — a single tap of the **Restart button** during the first 7 s of boot drops a headless dongle into a rescue shell over USB (`192.168.10.1` or `/dev/ttyACM0`); a **5-second hold** performs a factory reset.
 * **🔵 Bluetooth** — the WCNSS BT core (SMD) with BlueZ 5.83, an SSP pairing-repair guard, and a Bluetooth **Serial Port Profile** server/client (a serial console or TCP bridge over Bluetooth).
 * **🔐 WPA3-SAE Wi-Fi** — PMF/SAE support in the wcn36xx driver, plus **multi-SSID** (two APs on the one radio).
-* **🌡️ Thermal & power** — the CPU rail is now managed by **mainline CPR** (matching Android's rail voltage), the top CPU OPP is capped at 800 MHz, and Wi-Fi + PMIC thermal mitigation is wired up on the HMU05.
+* **🌡️ Thermal & power** — the CPU rail is now managed by **mainline CPR** (matching Android's rail voltage), the top CPU OPP is capped at 800 MHz, and Wi-Fi + PMIC thermal mitigation is wired up on the HMUF02-V5.
 * **🛡️ Modem stability** — the A2 power rail is held on in the driver (`a2_pin=1`), the modem NV `HiMI_OK` marker is rewritten after every boot, and a bearer watchdog performs pre-emptive SSR recovery.
 * **🔑 Signed package feed with self-heal** — the OTA `apk` feed is signed with a pinned key, and every device re-syncs that key from a stable URL at boot.
 * **📡 Carrier auto-provisioning** — automatic SIM/carrier MBN deployment with the QMI time daemon anchoring the modem clock before LTE attach.
@@ -34,7 +34,7 @@ Recent additions on top of the base port:
 * **📶 First-Boot Wi-Fi Auto-Start**: Automatically extracts Qualcomm WCNSS blobs, starts the remoteproc in-place, binds the physical radio path, and broadcasts an open `OpenWrt` 2.4 GHz AP (Channel 1, 2.412 GHz) on clean first boot.
 * **🔐 WPA3-SAE and Multi-SSID**: The wcn36xx driver advertises WPA3-SAE (PMF/IGTK), and the radio can host **two AP interfaces** at once. See [Wi-Fi](#-wi-fi).
 * **🔵 Bluetooth + Serial Port Profile**: WCNSS Bluetooth over SMD with BlueZ 5.83, an SSP pairing-repair guard, and an SPP server/client for a Bluetooth serial console or TCP bridge. See [Bluetooth](#-bluetooth).
-* **🌡️ Thermal & Power Management**: Mainline **CPR** CPU-rail scaling (Android-parity voltage), an 800 MHz CPU OPP cap, and Wi-Fi/PMIC thermal mitigation on the HMU05. See [Thermal & Power Management](#-thermal--power-management).
+* **🌡️ Thermal & Power Management**: Mainline **CPR** CPU-rail scaling (Android-parity voltage), an 800 MHz CPU OPP cap, and Wi-Fi/PMIC thermal mitigation on the HMUF02-V5. See [Thermal & Power Management](#-thermal--power-management).
 * **🛡️ Modem Stability Guard**: The A2 power rail is pinned on (`a2_pin=1`), the modem's `HiMI_OK` NV marker is rewritten after every modem boot, and `modem-bearer-watchdog` performs pre-emptive SSR recovery. See [Modem Stability](#-modem-stability).
 * **🌐 4G LTE Cellular Data & Carrier Auto-Provisioning**: Native **ModemManager** integration with automatic SIM carrier detection (`qcom-carrier-autocfg`), dynamic APN and Qualcomm Carrier MBN deployment, safe empty PLMN home operator attachment, and continuous self-healing daemon monitoring (`modem-led-monitor`).
 * **💾 Permanent eMMC Storage**: Automated `/dev/mmcblk0p15` (`rootfs_data`) EXT4 formatting and mounting, with preinit filesystem checking and automatic safe repair using `e2fsck -p`, providing persistent overlay storage without unnecessarily formatting an existing filesystem.
@@ -56,7 +56,7 @@ Recent additions on top of the base port:
 
 | Board Target  | Profile Name      | Device Model               | SoC     | RAM    | Storage   | LED mapping             |
 | :------------ | :---------------- | :------------------------- | :------ | :----- | :-------- | :---------------------- |
-| **`hmu05`**   | `generic-hmu05`   | Generic HMU05 (250605 V0S) | MSM8916 | 512 MB | 4 GB eMMC | Green / Blue / Red      |
+| **`hmuf02v5`**   | `generic-hmuf02v5`   | HMUF02-V5 (was HMU05) (250605 V0S) | MSM8916 | 512 MB | 4 GB eMMC | Green / Blue / Red      |
 | **`ufi001b`** | `generic-ufi001b` | Generic UFI001B 4G Stick   | MSM8916 | 512 MB | 4 GB eMMC | Green / Blue / Red      |
 | **`ufi003`**  | `generic-ufi003-mb-v02` | UFI003 MB V02 | MSM8916 | 512 MB | 4 GB eMMC | Green / Blue / Red      |
 | **`uz801`**   | `yiming-uz801v3`  | YiMing UZ801 v3 Dongle     | MSM8916 | 512 MB | 4 GB eMMC | Swapped (WLAN/WAN)      |
@@ -67,14 +67,14 @@ Recent additions on top of the base port:
 
 | Board     | Failsafe mode | Bluetooth | WPA3-SAE / Multi-SSID | CPU CPR + 800 MHz cap | Wi-Fi/PMIC cooling maps | `a2_pin` modem hold | `qcom-time-daemon` |
 | :-------- | :-----------: | :-------: | :-------------------: | :-------------------: | :---------------------: | :-----------------: | :----------------: |
-| `hmu05`   |      ✅       |    ✅     |          ✅           |          ✅           |           ✅            |         ✅          |         ✅         |
+| `hmuf02v5`   |      ✅       |    ✅     |          ✅           |          ✅           |           ✅            |         ✅          |         ✅         |
 | `ufi001b` |      ✅       |    ✅     |          ✅           |          ✅           |           —             |         —           |         —          |
 | `ufi003`  |      ✅       |    ✅     |          ✅           |          ✅           |           —             |         —           |         —          |
 | `uz801`   |      ✅       |    ✅     |          ✅           |          ✅           |           —             |         ✅          |         —          |
 | `uf02`    |      ✅       |    ✅     |          ✅           |          ✅           |           —             |         ✅          |         —          |
 | `mf800b`  |      ✅       |    ✅     |          ✅           |          ✅           |           —             |         —           |         —          |
 
-> The Wi-Fi/PMIC cooling maps are **HMU05-only** (device-tree gated). The `a2_pin` modem-rail hold is enabled on the **HMU05, UZ801 and UF02** boards — all three carry the same HiMI baseband family (`HIMI_U01_MODEM_V1.0`) exposed to the `a2_power.c:1189` quiesce wedge; `UFI003`, `UFI001B` (modem `MPSS.DPM.2.0.2`, V2.0) and `MF800B` do not set it. Everything else applies to every board. Failsafe mode is enabled on **every board** (LED colour varies by board); it has been **live-verified on the HMU05** only.
+> The Wi-Fi/PMIC cooling maps are **HMUF02-V5-only** (device-tree gated). The `a2_pin` modem-rail hold is enabled on the **HMUF02-V5, UZ801 and UF02** boards — all three carry the same HiMI baseband family (`HIMI_U01_MODEM_V1.0`) exposed to the `a2_power.c:1189` quiesce wedge; `UFI003`, `UFI001B` (modem `MPSS.DPM.2.0.2`, V2.0) and `MF800B` do not set it. Everything else applies to every board. Failsafe mode is enabled on **every board** (LED colour varies by board); it has been **live-verified on the HMUF02-V5** only.
 
 ### 🛠️ Adding a new board
 
@@ -382,7 +382,7 @@ These devices run hot in a small enclosure, and the modem's behaviour is sensiti
 
 * **CPU rail (mainline CPR)** — the CPU voltage is managed by mainline **CPR** (Core Power Reduction) rather than a fixed rail, matching Android's voltage for the silicon's fused speed bin. This lowers idle and mid-load CPU voltage versus a static setting.
 * **CPU OPP cap** — the top 998.4 MHz operating point is removed, so the CPUs run at up to **800 MHz** (matching Android's cap on these parts).
-* **Wi-Fi + PMIC thermal mitigation (HMU05)** — the `wcn36xx` driver exposes a cooling device that throttles the Wi-Fi transmit path, and the PMIC's thermal zone is bound to the CPU cooling device. Trips are triggered from the CPU cluster sensor, mirroring Android's `thermal-engine` "wlan" action.
+* **Wi-Fi + PMIC thermal mitigation (HMUF02-V5)** — the `wcn36xx` driver exposes a cooling device that throttles the Wi-Fi transmit path, and the PMIC's thermal zone is bound to the CPU cooling device. Trips are triggered from the CPU cluster sensor, mirroring Android's `thermal-engine` "wlan" action.
 
 ```bash
 # Inspect the thermal zones and their cooling devices
@@ -402,8 +402,8 @@ The Qualcomm baseband on these sticks can hit a **~900 s deadline** after a warm
 
 | Component | What it does |
 | :--- | :--- |
-| **`a2_pin` (HMU05, UZ801, UF02)** | Holds the A2 power rail **on** in the `qcom_bam_dmux` driver so the modem is not power-collapsed mid-handshake. Enabled via device tree on the three HiMI-baseband boards. |
-| **`himi-ok-guard`** | Rewrites the modem NV item `HiMI_OK` after **every** modem boot (cold and each SSR), so the RF task's identity check passes and the ~900 s deadline never arms. Enabled on the HMU05, UZ801 v3 and UF02 boards; writes only when the item reads all-zero (factory data is never overwritten). |
+| **`a2_pin` (HMUF02-V5, UZ801, UF02)** | Holds the A2 power rail **on** in the `qcom_bam_dmux` driver so the modem is not power-collapsed mid-handshake. Enabled via device tree on the three HiMI-baseband boards. |
+| **`himi-ok-guard`** | Rewrites the modem NV item `HiMI_OK` after **every** modem boot (cold and each SSR), so the RF task's identity check passes and the ~900 s deadline never arms. Enabled on the HMUF02-V5, UZ801 v3 and UF02 boards; writes only when the item reads all-zero (factory data is never overwritten). |
 | **`modem-bearer-watchdog`** | Watches the modem and data bearer; performs a pre-emptive subsystem restart and recovers a zombie bearer/ModemManager without a reboot. Automatically switches to a handover-safe **30/5 stall profile when moving** (`auto_mobile`, on by default — detects serving-cell changes over ModemManager D-Bus), reverting to the stationary profile after `mobile_grace_secs` (180 s) of stillness, and vice versa. A manual `mobile_optimized` force mode is also available. |
 | **`qcom-time-daemon`** | Anchors the modem's time base (ATS) before LTE attach so the QMI time sync is valid. |
 
@@ -446,7 +446,7 @@ When you plug in the modem stick with a SIM card inserted (or after swapping to 
 ### Why Is There No Reboot Anymore?
 
 1. **The AP no longer applies carrier MCFG.** The engine used to load and activate a per-carrier **Carrier MBN** (`mcfg_sw.mbn`) through the modem's PDC service (QMI), with a legacy fallback that copied the file over `/lib/firmware/MCFG_SW.MBN`. Both paths are gone.
-2. **Activating an MCFG forces the modem to self-reset.** The firmware's own `mcfg_utils.c:186` descriptor logs `"MCFG:Modem Initiated Reset. This crash is expected!!!"`. For some carriers the activation never even commits (the config stays Inactive while the already-Active config keeps serving — HMU05/Jio: `ROW_Generic_3GPP`). The AP then re-attempted it on **every** boot, and each attempt is a modem restart → SSR → A2-handshake desync (`a2_power.c:1189`) → crash loop.
+2. **Activating an MCFG forces the modem to self-reset.** The firmware's own `mcfg_utils.c:186` descriptor logs `"MCFG:Modem Initiated Reset. This crash is expected!!!"`. For some carriers the activation never even commits (the config stays Inactive while the already-Active config keeps serving — HMUF02-V5/Jio: `ROW_Generic_3GPP`). The AP then re-attempted it on **every** boot, and each attempt is a modem restart → SSR → A2-handshake desync (`a2_power.c:1189`) → crash loop.
 3. **The modem already serves the carrier on the Active MCFG config**, so the dynamic load bought nothing. It has therefore been disabled: `provision_carrier_mbn()` is now a log-only no-op (`return 1`).
 
 ### What `qcom-carrier-autocfg` Still Does (All Live, No Reboot)

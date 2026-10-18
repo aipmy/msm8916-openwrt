@@ -45,7 +45,7 @@ fs_log() {
 }
 
 # Fast-flash the status LED(s).  Board LED sysfs names (color:function):
-#   hmu05    red:power
+#   hmuf02v5    red:power
 #   ufi001b  red:power
 #   uf02     red
 #   mf800b   red:wlan red:wan red:charging

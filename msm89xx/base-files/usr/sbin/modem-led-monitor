@@ -31,7 +31,7 @@ MODEM_INDEX=""
 
 . /lib/functions.sh 2>/dev/null || true
 case "$(board_name 2>/dev/null)" in
-        *hmu05*) IS_HMU05=1 ;;
+        *hmu05*|*hmuf02v5*) IS_HMU05=1 ;;
         *) IS_HMU05=0 ;;
 esac
 
@@ -97,7 +97,7 @@ init_modem_hardware()
                 mmcli -m "$m_idx" -e >/dev/null 2>&1 || true
         fi
 
-        # On HMU05, lock band mask to LTE-only ONLY if network is Jio (pure LTE-only network without 2G/3G)
+        # On HMUF02-V5, lock band mask to LTE-only ONLY if network is Jio (pure LTE-only network without 2G/3G)
         # Other networks (Airtel, BSNL, Vi, Ncell, NTC, etc.) have active 2G/3G and must keep full bands
         if [ "$IS_HMU05" = "1" ]; then
                 local op_code="$(mmcli -m "$m_idx" --output-keyvalue 2>/dev/null | awk -F': ' '/modem.3gpp.operator-code/ {print $2}' | tr -d ' \r\n')"
@@ -124,7 +124,7 @@ init_modem_hardware()
                                         esac
                                 done
                                 if [ -n "$lte_bands" ]; then
-                                        logger -t modem-band-lock "HMU05 (Jio): Locking bands to LTE-only ($lte_bands) to eliminate 2G/3G IRAT measurement gap crashes..."
+                                        logger -t modem-band-lock "HMUF02-V5 (Jio): Locking bands to LTE-only ($lte_bands) to eliminate 2G/3G IRAT measurement gap crashes..."
                                         mmcli -m "$m_idx" --set-current-bands="$lte_bands" >/dev/null 2>&1 || true
                                 fi
                         fi
@@ -377,7 +377,7 @@ while true; do
 
 
         #
-        # Two-Pronged Keepalive & Safe Self-Healing Watchdog (HMU05 only)
+        # Two-Pronged Keepalive & Safe Self-Healing Watchdog (HMUF02-V5 only)
         #
         if [ "$STATE" = "healthy" ] && [ "$IS_HMU05" = "1" ]; then
                 run_watchdog_cycle

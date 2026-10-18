@@ -87,19 +87,19 @@ define Device/generic-ufi003-mb-v02
 endef
 TARGET_DEVICES += generic-ufi003-mb-v02
 
-define Device/generic-hmu05
+define Device/generic-hmuf02v5
 	$(Device/msm8916)
 	DEVICE_VENDOR := Generic
-	DEVICE_MODEL := HMU05
-	DEVICE_DTS := msm8916-generic-hmu05
-	SUPPORTED_DEVICES := hmu05,250605v0s
+	DEVICE_MODEL := HMUF02-V5
+	DEVICE_DTS := msm8916-generic-hmuf02v5
+	SUPPORTED_DEVICES := hmuf02v5,250605v0s hmu05,250605v0s
 	FILESYSTEMS := squashfs
 	DEVICE_PACKAGES := wpad-basic-wolfssl rmtfs uci-usb-gadget \
 		block-mount f2fs-tools tar \
 		msm-firmware-dumper reboot-edl qcom-carrier-autocfg qcom-time-daemon \
 		diag-efs diag-logtool
 endef
-TARGET_DEVICES += generic-hmu05
+TARGET_DEVICES += generic-hmuf02v5
 
 define Device/generic-mf800b
 	$(Device/msm8916)

@@ -153,7 +153,7 @@ run_all() {
         [ -z "${2:-}" ] || echo "$2" > "$s/uci/modem-watchdog.recovery.himi_ok_boards"
         T=$s PATH="$BIN:$PATH" sh -c ". '$BOARD_SRC'; himi_ok_board_match \"\$1\"" _ "$1"
     }
-    check "gate: hmu05 matches"                                gate "generic,hmu05"
+    check "gate: hmu05 matches"                                gate "generic,hmuf02v5"
     check "gate: yiming,uz801-v3 matches"                      gate "yiming,uz801-v3"
     check "gate: uf02 matches"                                 gate "generic,uf02"
     check "gate: ufi001b does NOT match"                       not gate "ufi001b"
@@ -161,8 +161,8 @@ run_all() {
     check "gate: uci list overrides the default"               gate "vendor,newboard" "*newboard*"
     check "gate: ...and a board outside the override fails"    not gate "yiming,uz801-v3" "*newboard*"
     # a file named like a pattern in the CWD must not replace the glob
-    mkdir -p "$ROOT/cwd"; : > "$ROOT/cwd/hmu05_fsg_extracted"
-    check "gate: CWD files do not glob-expand the list"        bash -c 'cd "$1" && T="$2" PATH="$3:$PATH" sh -c ". \"$4\"; himi_ok_board_match generic,hmu05"' _ "$ROOT/cwd" "$ROOT/cwd-uci" "$BIN" "$BOARD_SRC"
+    mkdir -p "$ROOT/cwd"; : > "$ROOT/cwd/hmuf02v5_fsg_extracted"
+    check "gate: CWD files do not glob-expand the list"        bash -c 'cd "$1" && T="$2" PATH="$3:$PATH" sh -c ". \"$4\"; himi_ok_board_match generic,hmuf02v5"' _ "$ROOT/cwd" "$ROOT/cwd-uci" "$BIN" "$BOARD_SRC"
 }
 
 MUT_FAIL=0

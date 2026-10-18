@@ -330,7 +330,7 @@ while true; do
 
     # 2. BAM-DMUX A2 pin.
     #
-    #    The A2 pin now lives in the DRIVER (kernel patch 848): the HMU05 board
+    #    The A2 pin now lives in the DRIVER (kernel patch 848): the HMUF02-V5 board
     #    DTS sets "qcom,a2-pin" on &bam_dmux, and bam_dmux_probe() calls
     #    pm_runtime_forbid() -- the exact equivalent of holding
     #    power/control=on -- so the A2 power-down vote can never run.  The

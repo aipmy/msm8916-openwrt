@@ -191,7 +191,7 @@ provision_network() {
 	local cur_apn cur_iptype cur_proto cur_allowed cur_preferred cur_eps cur_dns
 	local target_eps="default"
 	case "$(cat /tmp/sysinfo/board_name 2>/dev/null)" in
-		*hmu05*) target_eps="none" ;;
+		*hmu05*|*hmuf02v5*) target_eps="none" ;;
 	esac
 
 	cur_apn=$(uci -q get network.modem.apn || echo "")
@@ -241,7 +241,7 @@ provision_carrier_bands() {
 
 	# HMU05-only guard: prevent affecting other board targets
 	case "$(cat /tmp/sysinfo/board_name 2>/dev/null)" in
-		*hmu05*) ;;
+		*hmu05*|*hmuf02v5*) ;;
 		*) return 0 ;;
 	esac
 
@@ -372,7 +372,7 @@ check_and_flush_radio_cache() {
 
 		# 5. Radio Band configuration check (HMU05-only: older modem OS 1.0 IRAT workaround)
 		case "$(cat /tmp/sysinfo/board_name 2>/dev/null)" in
-			*hmu05*)
+			*hmu05*|*hmuf02v5*)
 				local cur_bands
 				cur_bands=$(echo "$modem_kv" | awk -F': ' '/modem.generic.current-bands.value/ {print $2}')
 				if [ "$is_jio" = "1" ]; then
