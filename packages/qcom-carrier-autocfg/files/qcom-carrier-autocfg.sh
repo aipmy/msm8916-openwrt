@@ -148,7 +148,7 @@ lookup_carrier_profile() {
 # `mcfg_utils.c:186` "MCFG:Modem Initiated Reset. This crash is expected!!!"
 # descriptor -- and for some carriers the activation never commits: the config
 # stays Inactive while whichever config was already Active keeps serving
-# (HMU05/Jio: ROW_Generic_3GPP).  The AP then re-attempted it on EVERY boot, and
+# (HMUF02-V5/Jio: ROW_Generic_3GPP).  The AP then re-attempted it on EVERY boot, and
 # each attempt is a modem restart -> SSR -> A2-handshake desync (a2_power.c:1189).
 # The modem already serves the carrier on the Active MCFG config, so the dynamic
 # load bought nothing and cost a crash loop.
@@ -239,7 +239,7 @@ provision_carrier_bands() {
 	local op_name="$5"
 	local is_jio="${6:-0}"
 
-	# HMU05-only guard: prevent affecting other board targets
+	# HMUF02-V5-only guard: prevent affecting other board targets
 	case "$(cat /tmp/sysinfo/board_name 2>/dev/null)" in
 		*hmu05*|*hmuf02v5*) ;;
 		*) return 0 ;;
@@ -250,7 +250,7 @@ provision_carrier_bands() {
 		cur_bands=$(mmcli -m "$m_path" --output-keyvalue 2>/dev/null | awk -F': ' '/modem.generic.current-bands.value/ {print $2}')
 
 		if echo "$cur_bands" | grep -qi -E '\<utran|\<geran'; then
-			log "HMU05 (Jio): Restricting modem bands to LTE-only (B1/B3/B5/B8) to eliminate 2G/3G IRAT measurement gap crashes..."
+			log "HMUF02-V5 (Jio): Restricting modem bands to LTE-only (B1/B3/B5/B8) to eliminate 2G/3G IRAT measurement gap crashes..."
 			mmcli -m "$m_path" --set-current-bands="eutran-1|eutran-3|eutran-5|eutran-8" 2>/dev/null || true
 		fi
 	elif [ "$is_jio" = "0" ] && [ -n "$m_path" ]; then
@@ -265,7 +265,7 @@ provision_carrier_bands() {
 		done
 
 		if [ -n "$all_bands" ] && ! echo "$cur_bands" | grep -qi -E '\<utran|\<geran'; then
-			log "HMU05 (Non-Jio Carrier '$carrier'): Restoring full multi-mode bands ($all_bands) for 2G/3G/4G support..."
+			log "HMUF02-V5 (Non-Jio Carrier '$carrier'): Restoring full multi-mode bands ($all_bands) for 2G/3G/4G support..."
 			mmcli -m "$m_path" --set-current-bands="$all_bands" 2>/dev/null || true
 		fi
 	fi
@@ -370,19 +370,19 @@ check_and_flush_radio_cache() {
 			need_flush=1
 		fi
 
-		# 5. Radio Band configuration check (HMU05-only: older modem OS 1.0 IRAT workaround)
+		# 5. Radio Band configuration check (HMUF02-V5-only: older modem OS 1.0 IRAT workaround)
 		case "$(cat /tmp/sysinfo/board_name 2>/dev/null)" in
 			*hmu05*|*hmuf02v5*)
 				local cur_bands
 				cur_bands=$(echo "$modem_kv" | awk -F': ' '/modem.generic.current-bands.value/ {print $2}')
 				if [ "$is_jio" = "1" ]; then
 					if echo "$cur_bands" | grep -qi -E '\<utran|\<geran'; then
-						log "HMU05: Radio band mismatch: Jio requires LTE-only, but radio cache contains 2G/3G bands"
+						log "HMUF02-V5: Radio band mismatch: Jio requires LTE-only, but radio cache contains 2G/3G bands"
 						need_flush=1
 					fi
 				else
 					if [ -n "$cur_bands" ] && ! echo "$cur_bands" | grep -qi -E '\<utran'; then
-						log "HMU05: Radio band mismatch: '$carrier_name' requires 3G/4G multi-mode, but radio cache is locked to LTE-only"
+						log "HMUF02-V5: Radio band mismatch: '$carrier_name' requires 3G/4G multi-mode, but radio cache is locked to LTE-only"
 						need_flush=1
 					fi
 				fi
@@ -441,7 +441,7 @@ connect_bearer() {
 
 	# NOTE: there is deliberately NO QMI-time / ATS_USER gate here.
 	#
-	# This function used to carry an HMU05-only block that waited up to 15 s for
+	# This function used to carry an HMUF02-V5-only block that waited up to 15 s for
 	# qcom-time-daemon's /var/run/qcom-time-synced marker and then `return 1` --
 	# refusing to bring up the LTE bearer unless the modem had confirmed an
 	# ATS_USER SET.  That gate rested on the SCLK / ~900 s calibration-watchdog
@@ -450,7 +450,7 @@ connect_bearer() {
 	# Android sends the ATS_USER SET once at boot and never gates LTE attach on
 	# it.  Attaching must therefore NOT depend on qcom-time-daemon, so that
 	# qcom-carrier-autocfg stays device-agnostic and qcom-time-daemon stays an
-	# optional, HMU05-only extra.
+	# optional, HMUF02-V5-only extra.
 
 	(
 		flock -x 200

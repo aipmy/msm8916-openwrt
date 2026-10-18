@@ -7,7 +7,7 @@
 The project builds a production-ready OpenWrt port for Qualcomm Snapdragon 410
 (MSM8916) based 4G LTE USB modems, dongles and pocket routers.
 
-**Supported boards:** `hmu05`, `ufi001b`, `ufi003` (MB V02),
+ **Supported boards:** `hmuf02v5`, `ufi001b`, `ufi003` (MB V02),
 `uz801` (v3), `uf02`, `mf800b`.
 
 **Build environment (short version):** clone with submodules, then run the

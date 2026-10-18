@@ -153,7 +153,7 @@ run_all() {
         [ -z "${2:-}" ] || echo "$2" > "$s/uci/modem-watchdog.recovery.himi_ok_boards"
         T=$s PATH="$BIN:$PATH" sh -c ". '$BOARD_SRC'; himi_ok_board_match \"\$1\"" _ "$1"
     }
-    check "gate: hmu05 matches"                                gate "generic,hmuf02v5"
+    check "gate: hmuf02v5 matches"                                gate "generic,hmuf02v5"
     check "gate: yiming,uz801-v3 matches"                      gate "yiming,uz801-v3"
     check "gate: uf02 matches"                                 gate "generic,uf02"
     check "gate: ufi001b does NOT match"                       not gate "ufi001b"
