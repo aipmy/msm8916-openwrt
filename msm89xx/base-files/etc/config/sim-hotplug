@@ -1,6 +1,6 @@
 config general 'general'
 	option enabled '1'
 	option idle_interval '60'
-	option active_interval '10'
-	option absent_interval '20'
+	option active_interval '5'
+	option absent_interval '6'
 	option pulse_ms '300'

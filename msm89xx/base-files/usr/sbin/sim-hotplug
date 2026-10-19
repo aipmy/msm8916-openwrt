@@ -31,14 +31,24 @@
 #   baseband from settling on the network (observed: modem stuck "searching"
 #   while the service pulsed every 5 s).
 #
-# DETECTION COST
+# DETECTION COST / LATENCY
 #   UIM polling is GATED so the QMI bus is almost never touched:
 #     * card present + modem registered -> one check per idle_interval (60 s)
-#     * card present + modem searching  -> one check per active_interval (10 s)
-#     * card absent                      -> one pulse + one check per
-#                                          absent_interval (20 s)
+#     * card present + modem searching  -> one check per active_interval (5 s)
+#     * card absent                      -> pulse + settle + check every
+#                                          absent_interval (6 s)
 #   "searching" on its own is NEVER treated as evidence of a swap (train /
 #   car / reselection) - only the UIM answer decides.
+#
+#   A pull drops the modem out of "registered" within ~1 s, so removal is
+#   caught by the 5 s active check (typ. 5-7 s, worst ~10 s).  An insertion is
+#   only seen when we pulse, so it is caught within one absent cycle
+#   (6 s wait + 4 s settle, typ. 6-10 s).  A swap of only 3-5 s is still
+#   caught: the card is electrically gone, the modem notices immediately, and
+#   it does NOT re-read on reinsertion - so it stays unregistered until our
+#   next pulse.  The only invisible case is a swap shorter than the modem's
+#   own removal debounce, which leaves the modem on its cached card; nothing
+#   on the AP side can observe that.
 #
 # QMI HYGIENE
 #   * Always --device-open-proxy: share /dev/wwan0qmi0 with ModemManager
@@ -67,6 +77,11 @@ config_get IDLE_INTERVAL   general idle_interval 60
 config_get ACTIVE_INTERVAL general active_interval 10
 config_get ABSENT_INTERVAL general absent_interval 20
 config_get PULSE_MS        general pulse_ms 300
+
+# Time for the baseband to re-initialise the card after a pulse.  While the
+# re-init runs, UIM still answers "possibly-removed", so querying too early
+# just re-arms the pulse loop.
+SETTLE=4
 
 log() { logger -t sim-hotplug "$*"; }
 
@@ -181,12 +196,13 @@ poll_loop() {
             # Card believed absent: re-announce, then see whether the baseband
             # now sees an inserted card.  This is the ONLY way an insertion is
             # ever noticed on this firmware.
-            sleep "$ABSENT_INTERVAL"
+            # Pulse straight away: while the card is out this is harmless, and
+            # it means an insertion that happens during this cycle is caught by
+            # the NEXT pulse, one absent_interval later.
             pulse_sim
             # The pulse makes the baseband re-initialise the card; while that
-            # is in progress UIM answers "possibly-removed" again.  Give it a
-            # few seconds to settle before asking.
-            sleep 5
+            # is in progress UIM answers "possibly-removed" again.
+            sleep "$SETTLE"
             u=$(uim_state)
             last=$(date +%s)
             case "$u" in
@@ -217,6 +233,7 @@ poll_loop() {
                     last=$(date +%s)
                     ;;
             esac
+            [ "$removed" -eq 1 ] && sleep "$ABSENT_INTERVAL"
             continue
         fi
 
@@ -242,7 +259,12 @@ poll_loop() {
                     ;;
             esac
         fi
-        sleep 5
+        # React quickly while the modem is out of service (a SIM pull shows up
+        # as registered -> searching); stay lazy when everything is healthy.
+        case "$st" in
+            registered|connected|connecting) sleep 5 ;;
+            *)                               sleep 2 ;;
+        esac
     done
 }
 
