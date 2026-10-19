@@ -41,17 +41,17 @@ Before this branch every image reported the stock OpenWrt version, because
 `CONFIG_VERSION_*` symbols were dropped by `make defconfig` (they require
 `CONFIG_VERSIONOPT=y`).
 
-- New single source of truth: the `version` file (`25.12.5-r5`).
+- New single source of truth: the `version` file (`25.12.5-r6`).
 - `sync-version.sh` propagates it into every `diffconfigs/*`:
   `VERSION_DIST/NUMBER/CODE/REPO/HOME_URL/BUG_URL`, with `CONFIG_VERSIONOPT=y`.
 - `CONFIG_VERSION_CODE` is empty so the version renders **once**
-  (`25.12.5-r5`, not `25.12.5-r5 r5`).
+  (`25.12.5-r6`, not `25.12.5-r6 r6`).
 
 Live check:
 
 ```sh
-ubus call system board | jsonfilter -e @.release.version   # 25.12.5-r5
-grep VERSION_ID /etc/os-release                            # 25.12.5-r5
+ubus call system board | jsonfilter -e @.release.version   # 25.12.5-r6
+grep VERSION_ID /etc/os-release                            # 25.12.5-r6
 ```
 
 Firmware filenames now carry the project prefix, e.g.

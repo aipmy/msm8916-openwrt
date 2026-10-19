@@ -8,9 +8,9 @@
 
 ---
 
-### v25.12.5-r6 (unreleased) — branch `test/hmuf02v5-rename-and-version`
+### v25.12.5-r6 (2026-10-19) — built from `main`
 
-*A board-identity and SIM hot-swap release. Bump `version` to `25.12.5-r6` before tagging.*
+*A board-identity and SIM hot-swap release.*
 
 **Why this release** — The HMU05 target is renamed to the name on the silkscreen (**HMUF02-V5**), every image now reports the project's own release version instead of the stock OpenWrt one, and physically swapping a SIM card is handled automatically in about 15 seconds with no reboot — including a card from a different carrier.
 
@@ -18,7 +18,7 @@
 
 **🏷️ HMU05 → HMUF02-V5 rename** — DTS, device profile, diffconfig, patch filenames and CI globs now say `hmuf02v5`. Backwards compatibility is preserved: `hmu05,250605v0s` stays in `SUPPORTED_DEVICES` (an older image can sysupgrade to this one) and the runtime board globs match both names. `uf02` remains a separate board.
 
-**🔢 Release identification** — the `version` file is the single source of truth, propagated by `sync-version.sh` into every diffconfig with `CONFIG_VERSIONOPT=y`. Images report the project version in `ubus call system board` and `/etc/os-release` instead of the stock OpenWrt one, and firmware filenames carry the `msm8916-openwrt-` prefix. **Bump `version` before tagging this release.**
+**🔢 Release identification** — the `version` file is the single source of truth, propagated by `sync-version.sh` into every diffconfig with `CONFIG_VERSIONOPT=y`. Images report the project version in `ubus call system board` and `/etc/os-release` instead of the stock OpenWrt one, and firmware filenames carry the `msm8916-openwrt-` prefix. This release reports **`25.12.5-r6`**.
 
 **👥 Maintainer policy** — `CODEOWNERS` + `MAINTAINERS.md` route UZ801 and UFI003 to their board maintainer.
 
