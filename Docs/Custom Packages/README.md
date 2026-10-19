@@ -48,6 +48,31 @@ They fall into two groups:
 
 ---
 
+## Base-files services
+
+Some on-device programs ship in `msm89xx/base-files/` rather than as a package
+(they are part of the target's default configuration):
+
+| Program | What it does |
+| :--- | :--- |
+| `sim-hotplug` | Detects a physical SIM swap and re-announces the card to the baseband (`/etc/init.d/sim-hotplug`, `rescan` command). |
+| `himi-ok-guard` | Rewrites the modem NV `HiMI_OK` marker after every modem boot. |
+| `modem-bearer-watchdog` | Watches the modem/bearer, performs pre-emptive SSR and zombie recovery (logs as `modem-stall-watchdog`). |
+| `modem-led-monitor` / `wifi-led-monitor` | Drive the status LEDs from modem and Wi-Fi state. |
+| `apk-key-refresh` | Re-syncs the pinned APK feed signing key at boot. |
+
+**Every custom program — package or base-files — answers `-h`/`--help`** with its
+options, the `uci` keys it honours, and the `logread` tag to watch:
+
+```sh
+sim-hotplug --help
+modem-bearer-watchdog --help
+diag-bind --help
+diag_nv --help
+```
+
+---
+
 ## How they get into the image
 
 The packages are selected per-board in each target's `diffconfig` / `modules.mk`

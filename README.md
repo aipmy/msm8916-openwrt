@@ -17,6 +17,7 @@ Features a modern **Linux 6.12 mainline kernel**, **ModemManager 1.24**, **Qualc
 
 Recent additions on top of the base port:
 
+* **📲 Physical SIM hot-swap** — pull the card and insert another: `sim-hotplug` detects the swap, re-announces the card to the baseband, re-reads it through ModemManager and restores data in **~15 s**, with **no reboot** (even a different carrier).
 * **🆘 Failsafe mode** — a single tap of the **Restart button** during the first 7 s of boot drops a headless dongle into a rescue shell over USB (`192.168.10.1` or `/dev/ttyACM0`); a **5-second hold** performs a factory reset.
 * **🔵 Bluetooth** — the WCNSS BT core (SMD) with BlueZ 5.83, an SSP pairing-repair guard, and a Bluetooth **Serial Port Profile** server/client (a serial console or TCP bridge over Bluetooth).
 * **🔐 WPA3-SAE Wi-Fi** — PMF/SAE support in the wcn36xx driver, plus **multi-SSID** (two APs on the one radio).
@@ -438,7 +439,7 @@ ubus call network.interface.modem status   # data bearer state
 
 ## 📡 SIM Detection, Carrier Auto-Provisioning & Reboot Behavior
 
-When you plug in the modem stick with a SIM card inserted (or after swapping to a different cellular carrier), the device **connects automatically — with no reboot**. Carrier detection, APN/network configuration, band selection, radio-cache flush, and LTE bearer bring-up are all performed live by the `qcom-carrier-autocfg` daemon.
+When you plug in the modem stick with a SIM card inserted — or physically swap the card — the device **connects automatically, with no reboot**. `sim-hotplug` notices the physical swap and re-announces the card to the baseband; carrier detection, APN/network configuration, band selection, radio-cache flush, and LTE bearer bring-up are then performed live by the `qcom-carrier-autocfg` daemon.
 
 > [!NOTE]
 > **Earlier builds rebooted once after ~10–15 seconds to reload a carrier MBN. That behavior has been removed.** The device no longer uses `mcfg.mbn` / `MCFG_SW.MBN`, and no provisioning step reboots the system.
@@ -459,7 +460,35 @@ When you plug in the modem stick with a SIM card inserted (or after swapping to 
 
 ### SIM Hot-Swapping Behavior
 
-Inserting a different SIM is handled **live and without reboot** for every carrier: the daemon flushes the baseband radio cache and reconnects the network bearer with the new carrier's APN. The former "one-time reboot on carrier-family change" no longer exists.
+Pull the card, insert another, and the device recovers **live, without a reboot**, even when the new card is from a different carrier.
+
+These dongles have **no AP-side card-detect line**. GPIO 114 (`sim_hotplug`) is an *output* that the AP drives to make the baseband re-read the card, and the baseband firmware has `feature_support_hotswap` **disabled**: it notices a card **removal** (UIM reports `possibly-removed`) but **never notices an insertion** — a card can sit in the slot for minutes and the modem will not see it until the AP pulses `sim_hotplug`.
+
+The `sim-hotplug` service handles this:
+
+| State | Behaviour |
+| :--- | :--- |
+| Card present + modem registered | one UIM check every **60 s** |
+| Card present + modem searching | one UIM check every **5 s** (cadence only — `searching` alone never means "swap", so a train/cell reselection triggers nothing) |
+| Card believed absent | pulse `sim_hotplug` → wait 4 s → check, every **6 s** |
+
+On `absent → present` it waits for registration, forces ModemManager to re-read the SIM (`mmcli -d` + `-e`, which is what makes a **different** card's IMSI/APN visible to `qcom-carrier-autocfg`), then brings the bearer back up.
+
+Measured end to end on hardware: **~15 s** for a ~4 s swap (removal detected in 5–7 s, insertion in ≤10 s).
+
+```sh
+sim-hotplug --help                  # options and log tag
+/etc/init.d/sim-hotplug status
+/etc/init.d/sim-hotplug rescan      # force one re-announce now
+logread -e sim-hotplug
+```
+
+Tuning lives in `/etc/config/sim-hotplug`: `idle_interval` (60), `active_interval` (5), `absent_interval` (6), `pulse_ms` (300).
+
+> [!NOTE]
+> A swap **shorter than the modem's own removal debounce** is invisible: the modem keeps its cached card, stays `connected`, and UIM keeps answering `present`, so there is nothing for the AP to detect. This is harmless when the same card goes back in. If a *different* card is inserted that quickly, run `/etc/init.d/sim-hotplug rescan` — or let the bearer watchdog's SSR re-initialise UIM when data fails.
+
+The service uses `qmicli --device-open-proxy` (sharing the port with ModemManager through `qmi-proxy`), one short-lived client at a time, always under `timeout`; it never issues `mmcli -r` or an SSR itself. This avoids the `ClientIdsExhausted` failure that a naive `qmicli` poll loop causes.
 
 ### Custom SIM Carrier Installation
 
@@ -555,6 +584,10 @@ apk add luci-app-modem-watchdog
 The packages authored and vendored in this repo (DIAG tools, carrier autoconfig,
 Bluetooth SPP, LuCI apps, …) are documented in
 **[`Docs/Custom Packages/`](Docs/Custom%20Packages/README.md)**.
+
+Every custom on-device program answers `--help` (or `-h`) with its options, the
+`uci` keys it reads, and the `logread` tag to watch — for example
+`diag-bind --help`, `modem-bearer-watchdog --help`, `diag_nv --help`.
 
 ---
 
