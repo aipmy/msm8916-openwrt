@@ -118,9 +118,9 @@ jobs:
       with:
         name: openwrt_firmware_${{ matrix.device }}_${{needs.resolve-version.outputs.openwrt_version}}_${{ env.FILE_DATE }}
         path: |
-          ${{ env.FIRMWARE }}/openwrt-msm89xx-*-squashfs-gpt_both0.bin
-          ${{ env.FIRMWARE }}/openwrt-msm89xx-*-squashfs-boot.img
-          ${{ env.FIRMWARE }}/openwrt-msm89xx-*-squashfs-system.img
-          ${{ env.FIRMWARE }}/openwrt-msm89xx-*.manifest
-          ${{ env.FIRMWARE }}/openwrt-msm89xx-*-flash.sh
-          ${{ env.FIRMWARE }}/openwrt-msm89xx-*-firmware.zip
+          ${{ env.FIRMWARE }}/*-msm89xx-*-squashfs-gpt_both0.bin
+          ${{ env.FIRMWARE }}/*-msm89xx-*-squashfs-boot.img
+          ${{ env.FIRMWARE }}/*-msm89xx-*-squashfs-system.img
+          ${{ env.FIRMWARE }}/*-msm89xx-*.manifest
+          ${{ env.FIRMWARE }}/*-msm89xx-*-flash.sh
+          ${{ env.FIRMWARE }}/*-msm89xx-*-firmware.zip

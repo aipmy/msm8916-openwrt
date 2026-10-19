@@ -1,0 +1,262 @@
+#!/bin/sh
+#
+# sim-hotplug - detect a physical SIM swap and re-announce the card to the
+#               baseband on the HMUF02-V5 (MSM8916).
+#
+# WHY THIS EXISTS
+#   The HMUF02-V5 has NO AP-side SIM card-detect line.  GPIO114 (sim_hotplug)
+#   is an OUTPUT: the AP drives it LOW ("card present") and toggles it to make
+#   the baseband re-read the card.  GPIO119 (esim1_en) is the SIM rail enable.
+#
+#   ModemManager cannot be used as the detector: its qcom-soc plugin reads the
+#   SIM once at modem enable and then CACHES it.  After the card is pulled,
+#   mmcli still reports the old IMSI/ICCID (the SIM object never disappears),
+#   and "modem.generic.state" only degrades to "searching".
+#
+#   The one reliable AP-visible presence signal is the modem's own UIM card
+#   status (qmicli --uim-get-card-status).  While the card is out - or while
+#   the baseband has not re-read a card that is physically back in - the
+#   firmware answers "error: possibly-removed (6)" on stderr.
+#
+# THE CRITICAL ASYMMETRY (measured 2026-10-19)
+#   The modem firmware has feature_support_hotswap DISABLED.  It notices a
+#   REMOVAL on its own (the card stops answering), but it never notices an
+#   INSERTION: with the card physically inserted, UIM kept answering
+#   "possibly-removed" for minutes.  One sim_hotplug pulse made it report
+#   "present" in <5 s and the modem registered ~10 s later.
+#
+#   Therefore this service must PULSE WHILE THE CARD IS BELIEVED ABSENT - that
+#   pulse is the only way an inserted card is ever discovered.  Conversely it
+#   must NOT pulse once UIM reports present: pulsing a working card keeps the
+#   baseband from settling on the network (observed: modem stuck "searching"
+#   while the service pulsed every 5 s).
+#
+# DETECTION COST
+#   UIM polling is GATED so the QMI bus is almost never touched:
+#     * card present + modem registered -> one check per idle_interval (60 s)
+#     * card present + modem searching  -> one check per active_interval (10 s)
+#     * card absent                      -> one pulse + one check per
+#                                          absent_interval (20 s)
+#   "searching" on its own is NEVER treated as evidence of a swap (train /
+#   car / reselection) - only the UIM answer decides.
+#
+# QMI HYGIENE
+#   * Always --device-open-proxy: share /dev/wwan0qmi0 with ModemManager
+#     through qmi-proxy.  A direct open steals the port from MM.
+#   * One qmicli process at a time (busybox flock, no -w) and always under
+#     'timeout'.  Concurrent or long-lived clients exhaust the modem's
+#     client-ID pool and leave ModemManager failed with 'ClientIdsExhausted'.
+#   * Never reset the modem from here (mmcli -r / SSR): it re-enumerates MM and
+#     can leave it 'failed'.  The pulse alone is the validated trigger.
+#
+# Usage:
+#   sim-hotplug start     run the poll loop (procd)
+#   sim-hotplug rescan    force one re-announce (manual test)
+#
+
+SIM_LED="/sys/class/leds/sim_hotplug/brightness"
+QMI_DEV="/dev/wwan0qmi0"
+LOCK="/var/lock/sim-hotplug.lock"
+BEARER_LOCK="/var/lock/modem-bearer.lock"
+
+. /lib/functions.sh
+
+config_load sim-hotplug
+config_get_bool ENABLED general enabled 1
+config_get IDLE_INTERVAL   general idle_interval 60
+config_get ACTIVE_INTERVAL general active_interval 10
+config_get ABSENT_INTERVAL general absent_interval 20
+config_get PULSE_MS        general pulse_ms 300
+
+log() { logger -t sim-hotplug "$*"; }
+
+pulse_sim() {
+    [ -w "$SIM_LED" ] || return 1
+    echo 255 > "$SIM_LED" 2>/dev/null
+    if command -v usleep >/dev/null 2>&1; then
+        usleep $((PULSE_MS * 1000))
+    else
+        sleep 1
+    fi
+    echo 0 > "$SIM_LED" 2>/dev/null
+    return 0
+}
+
+modem_index() {
+    mmcli -L 2>/dev/null | sed -n 's|.*/Modem/\([0-9][0-9]*\).*|\1|p' | head -n1
+}
+
+# Echo the ModemManager state, e.g. registered / connected / searching / enabled.
+modem_state() {
+    [ -n "$MODEM_IDX" ] || MODEM_IDX=$(modem_index)
+    [ -n "$MODEM_IDX" ] || { echo none; return; }
+    st=$(timeout 6 mmcli -m "$MODEM_IDX" -K 2>/dev/null |
+         awk '/^modem[.]generic[.]state /{sub(/^[^:]*:[[:space:]]*/, ""); print; exit}')
+    if [ -z "$st" ]; then
+        MODEM_IDX=$(modem_index)
+        echo unknown
+        return
+    fi
+    echo "$st"
+}
+
+# Echo: present | absent | exhaust | unknown
+uim_state() {
+    out=$(timeout 12 flock "$LOCK" qmicli --device-open-proxy -d "$QMI_DEV" \
+          --uim-get-card-status 2>&1)
+    case "$out" in
+        *ClientIdsExhausted*|*client-ids-exhausted*) echo exhaust; return ;;
+        *possibly-removed*)                          echo absent;  return ;;
+    esac
+    card=$(printf '%s\n' "$out" | awk -F"'" '/Card state:/ {print $2; exit}')
+    case "$card" in
+        present) echo present ;;
+        absent)  echo absent  ;;
+        *)       echo unknown ;;
+    esac
+}
+
+# Wait for the modem to register after the card has been re-read.
+wait_register() {
+    local i=0 st
+    while [ "$i" -lt 12 ]; do
+        st=$(modem_state)
+        case "$st" in
+            registered|connected|connecting) return 0 ;;
+        esac
+        sleep 5
+        i=$((i + 1))
+    done
+    return 1
+}
+
+# Force ModemManager to re-read the SIM.  MM caches the SIM object across a
+# physical swap, so without this a DIFFERENT card would keep the old IMSI and
+# qcom-carrier-autocfg would not re-provision the APN.  Disable/enable is the
+# lightest way to make the qcom-soc plugin reload it (~10 s, no SSR).
+refresh_modem() {
+    [ -n "$MODEM_IDX" ] || MODEM_IDX=$(modem_index)
+    [ -n "$MODEM_IDX" ] || return 1
+    log "re-reading the SIM through ModemManager"
+    timeout 30 mmcli -m "$MODEM_IDX" -d >/dev/null 2>&1
+    sleep 3
+    timeout 30 mmcli -m "$MODEM_IDX" -e >/dev/null 2>&1
+    MODEM_IDX=$(modem_index)
+    [ -n "$MODEM_IDX" ] || return 1
+    # never leave the modem disabled
+    [ "$(modem_state)" = "none" ] && timeout 30 mmcli -m "$MODEM_IDX" -e >/dev/null 2>&1
+    return 0
+}
+
+# Bring the data bearer up after a swap.  Reuses the bearer lock so we never
+# race modem-bearer-watchdog / qcom-carrier-autocfg.
+bring_up_bearer() {
+    log "bringing the modem bearer up"
+    ( timeout 40 flock "$BEARER_LOCK" ifup modem ) >/dev/null 2>&1
+}
+
+poll_loop() {
+    local removed=0 last now st u iv miss=0
+
+    # Let ModemManager finish enumerating before the first query.
+    sleep 10
+
+    u=$(uim_state)
+    case "$u" in
+        absent)
+            removed=1
+            log "no SIM visible to the baseband - will re-announce until it appears"
+            ;;
+        present)
+            log "SIM present at startup"
+            ;;
+        *)
+            log "SIM state unknown at startup ($u)"
+            ;;
+    esac
+    last=$(date +%s)
+
+    while true; do
+        if [ "$removed" -eq 1 ]; then
+            # Card believed absent: re-announce, then see whether the baseband
+            # now sees an inserted card.  This is the ONLY way an insertion is
+            # ever noticed on this firmware.
+            sleep "$ABSENT_INTERVAL"
+            pulse_sim
+            # The pulse makes the baseband re-initialise the card; while that
+            # is in progress UIM answers "possibly-removed" again.  Give it a
+            # few seconds to settle before asking.
+            sleep 5
+            u=$(uim_state)
+            last=$(date +%s)
+            case "$u" in
+                present)
+                    log "SIM detected after re-announce"
+                    removed=0
+                    if wait_register; then
+                        log "modem registered"
+                        refresh_modem
+                        wait_register && log "modem re-registered after SIM re-read"
+                        bring_up_bearer
+                    else
+                        log "modem not registered yet - continuing to monitor"
+                    fi
+                    ;;
+                absent)
+                    miss=$((miss + 1))
+                    if [ $((miss % 3)) -eq 0 ]; then
+                        log "card still not visible after re-announce ($miss)"
+                    fi
+                    ;;
+                unknown)
+                    miss=$((miss + 1))
+                    ;;
+                exhaust)
+                    log "QMI client IDs exhausted - backing off 60 s"
+                    sleep 60
+                    last=$(date +%s)
+                    ;;
+            esac
+            continue
+        fi
+
+        st=$(modem_state)
+        case "$st" in
+            registered|connected|connecting) iv=$IDLE_INTERVAL ;;
+            *)                               iv=$ACTIVE_INTERVAL ;;
+        esac
+
+        now=$(date +%s)
+        if [ $((now - last)) -ge "$iv" ]; then
+            u=$(uim_state)
+            last=$now
+            case "$u" in
+                absent)
+                    log "SIM removed (UIM absent)"
+                    removed=1
+                    ;;
+                exhaust)
+                    log "QMI client IDs exhausted - backing off 60 s"
+                    sleep 60
+                    last=$(date +%s)
+                    ;;
+            esac
+        fi
+        sleep 5
+    done
+}
+
+arg="$1"
+[ -z "$arg" ] && arg=start
+case "$arg" in
+    rescan)
+        pulse_sim && log "manual re-announce (rescan)"
+        ;;
+    start)
+        [ "$ENABLED" -eq 1 ] && poll_loop
+        ;;
+    *)
+        echo "usage: $0 [start|rescan]" >&2
+        exit 1
+        ;;
+esac

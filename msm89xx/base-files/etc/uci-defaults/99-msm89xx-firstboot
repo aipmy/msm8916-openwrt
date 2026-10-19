@@ -110,6 +110,17 @@ set usbgadget.acm.description='Serial console'
 set usbgadget.acm.shell='1'
 EOF
 
+###############################################################################
+# Per-board hostname
+#
+# Every board would otherwise be called "OpenWrt", which makes it impossible
+# to tell several boards apart on the network.  board_name is the first DT
+# compatible string (e.g. "hmuf02v5,250605v0s"); keep the model part only.
+###############################################################################
+
+BOARD="$(cut -d, -f1 /tmp/sysinfo/board_name 2>/dev/null)"
+[ -n "$BOARD" ] && uci set system.@system[0].hostname="$BOARD"
+
 uci commit
 
 [ -x /etc/init.d/umount-overlay ] && /etc/init.d/umount-overlay enable

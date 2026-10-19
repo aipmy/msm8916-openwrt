@@ -104,12 +104,12 @@ jobs:
           shopt -s nullglob
           NAMES=()
           for pat in \
-            'openwrt-msm89xx-msm8916-*-squashfs-boot.img' \
-            'openwrt-msm89xx-msm8916-*-squashfs-system.img' \
-            'openwrt-msm89xx-msm8916-*-squashfs-sysupgrade.bin' \
-            'openwrt-msm89xx-msm8916-*-squashfs-gpt_both0.bin' \
-            'openwrt-msm89xx-msm8916-*-flash.sh' \
-            'openwrt-msm89xx-msm8916-*-firmware.zip'; do
+            '*-msm89xx-msm8916-*-squashfs-boot.img' \
+            '*-msm89xx-msm8916-*-squashfs-system.img' \
+            '*-msm89xx-msm8916-*-squashfs-sysupgrade.bin' \
+            '*-msm89xx-msm8916-*-squashfs-gpt_both0.bin' \
+            '*-msm89xx-msm8916-*-flash.sh' \
+            '*-msm89xx-msm8916-*-firmware.zip'; do
             for f in $pat; do NAMES+=("$f"); done
           done
 

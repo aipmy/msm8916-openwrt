@@ -393,6 +393,48 @@ apply_compatibility_fixes() {
             "$luci_file"
 
     fi
+
+    fix_luci_branch_metadata
+}
+
+###############################################################################
+# LuCI feed branch metadata
+#
+# Feeds are cloned with 'git clone --depth 1' and then pinned to a detached
+# commit, so 'git branch --contains' finds no branch.  luci.mk then falls back
+# to the detached marker and LuCI's overview page renders
+#
+#   LuCI (HEAD detached at 128a7812) branch <version>
+#
+# instead of a real branch name.  Fetching the matching release branch ref is
+# enough to fix the display (e.g. "LuCI openwrt-25.12 branch").
+#
+# Cosmetic only, and never fatal: a failed fetch just leaves the old string.
+###############################################################################
+
+fix_luci_branch_metadata() {
+
+    local feed="$OPENWRT_DIR/feeds/luci"
+    local branch
+
+    [ -d "$feed/.git" ] || return 0
+
+    # Already resolvable? Nothing to do.
+    [ -n "$(git -C "$feed" branch -r --contains HEAD 2>/dev/null)" ] &&
+        return 0
+
+    case "$OPENWRT_VERSION" in
+        [0-9]*.[0-9]*) ;;
+        *) return 0 ;;
+    esac
+
+    branch="openwrt-$(printf '%s' "$OPENWRT_VERSION" | cut -d. -f1-2)"
+
+    info "Fetching LuCI branch metadata ($branch)..."
+
+    git -C "$feed" fetch origin \
+        "+refs/heads/$branch:refs/remotes/origin/$branch" \
+        >/dev/null 2>&1 || true
 }
 
 ###############################################################################

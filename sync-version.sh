@@ -27,7 +27,7 @@ fi
 BASE="${VER%-r*}"
 REL="${VER##*-}"
 
-BLOCK=$(printf 'CONFIG_VERSIONOPT=y\nCONFIG_VERSION_FILENAMES=n\nCONFIG_VERSION_DIST="msm8916-openwrt"\nCONFIG_VERSION_NUMBER="%s"\nCONFIG_VERSION_CODE="%s"\nCONFIG_VERSION_REPO="https://akbar-npj.github.io/msm8916-openwrt/releases/%s/packages"\nCONFIG_VERSION_HOME_URL="https://github.com/akbar-npj/msm8916-openwrt"\nCONFIG_VERSION_BUG_URL="https://github.com/akbar-npj/msm8916-openwrt/issues"' "$VER" "$REL" "$BASE")
+BLOCK=$(printf 'CONFIG_VERSIONOPT=y\nCONFIG_VERSION_FILENAMES=n\nCONFIG_VERSION_DIST="msm8916-openwrt"\nCONFIG_VERSION_NUMBER="%s"\nCONFIG_VERSION_CODE=""\nCONFIG_VERSION_REPO="https://akbar-npj.github.io/msm8916-openwrt/releases/%s/packages"\nCONFIG_VERSION_HOME_URL="https://github.com/akbar-npj/msm8916-openwrt"\nCONFIG_VERSION_BUG_URL="https://github.com/akbar-npj/msm8916-openwrt/issues"' "$VER" "$BASE")
 
 for f in "$REPO_DIR"/diffconfigs/*; do
   [ -f "$f" ] || continue

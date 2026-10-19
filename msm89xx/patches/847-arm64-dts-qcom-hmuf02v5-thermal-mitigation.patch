@@ -9,7 +9,7 @@ the CPU cluster sensor (Wi-Fi) and give pm8916-thermal a cooling device (CPU).
 
 --- a/arch/arm64/boot/dts/qcom/msm8916-generic-hmuf02v5.dts
 +++ b/arch/arm64/boot/dts/qcom/msm8916-generic-hmuf02v5.dts
-@@ -218,3 +218,67 @@
+@@ -232,3 +232,67 @@
          line-name = "ftest";
      };
  };

@@ -1,6 +1,6 @@
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8916-generic-hmuf02v5.dts
-@@ -0,0 +1,227 @@
+@@ -0,0 +1,234 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +/dts-v1/;
@@ -150,6 +150,27 @@
 + * retained independently of userspace.
 + */
 +
++/*
++ * SIM presence / hotplug control line (TLMM GPIO114).
++ *
++ * Android exposed this as a gpio-leds sysfs node and toggled it at runtime to
++ * re-announce SIM presence to the baseband. We replicate that so userspace can
++ * pulse it on a hot SIM swap. default-state "off" drives the line LOW, which is
++ * the "SIM present" assertion the baseband expects.
++ */
++/ {
++    sim-presence {
++        compatible = "gpio-leds";
++
++        sim_hotplug {
++            gpios = <&tlmm 114 GPIO_ACTIVE_HIGH>;
++            default-state = "off";
++            linux,default-trigger = "none";
++            retain-state-suspended;
++        };
++    };
++};
++
 +&tlmm {
 +
 +    /*
@@ -191,22 +212,8 @@
 +        line-name = "sim3_en";
 +    };
 +
-+    /*
-+     * SIM hotplug/control line.
-+     *
-+     * Despite its Android name "sim_hotplug", Android drives
-+     * this GPIO as an output rather than configuring it as
-+     * an interrupt/input.
-+     *
-+     * Android:
-+     *   GPIO114 = output LOW
-+     */
-+    sim_hotplug {
-+        gpio-hog;
-+        gpios = <114 GPIO_ACTIVE_HIGH>;
-+        output-low;
-+        line-name = "sim_hotplug";
-+    };
++    /* sim_hotplug moved to a gpio-leds node (see /sim-presence) so userspace
++     * can toggle it to re-announce SIM presence to the baseband on hot-swap. */
 +
 +    /*
 +     * Android "bat1" GPIO.
