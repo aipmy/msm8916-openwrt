@@ -10,23 +10,23 @@
 
 ### v25.12.5-r6 (2026-10-19) — built from `main`
 
-*A board-identity and SIM hot-swap release.*
+*Swap the SIM without rebooting — and the board finally carries its real name.*
 
-**Why this release** — The HMU05 target is renamed to the name on the silkscreen (**HMUF02-V5**), every image now reports the project's own release version instead of the stock OpenWrt one, and physically swapping a SIM card is handled automatically in about 15 seconds with no reboot — including a card from a different carrier.
+**Why this release** — Two long-standing annoyances are gone. Replacing a SIM card used to require a reboot (or silently did nothing, because the modem never noticed the new card); it is now automatic in about **15 seconds**, even when the new card is from a different carrier. And the HMU05 target — the board this project is validated on — now uses the name printed on the silkscreen, **HMUF02-V5**, with images that report their own release version instead of the stock OpenWrt one.
 
-**📲 Physical SIM hot-swap (new)** — These dongles have no AP-side card-detect line, and the baseband firmware has `feature_support_hotswap` disabled: it notices a **removal** but never an **insertion**. The new `sim-hotplug` service therefore polls UIM at a low rate while a card is present (60 s idle / 5 s while searching) and, when the card is believed absent, **pulses `sim_hotplug`** and re-checks every 6 s. On `absent → present` it waits for registration, forces ModemManager to re-read the SIM (`mmcli -d` + `-e`) so a different card's IMSI/APN reaches `qcom-carrier-autocfg`, and brings the bearer back up. Measured **~15 s** end to end (was ~35 s). `searching` alone never triggers anything, so a train or cell reselection is not mistaken for a swap. QMI hygiene: `--device-open-proxy`, one short-lived client at a time, always under `timeout` — no `ClientIdsExhausted`.
+**📲 Physical SIM hot-swap (new)** — These sticks have no AP-side card-detect line, and the baseband firmware is built with hot-swap **disabled**: it notices a card being *removed* but never notices one being *inserted*. The new `sim-hotplug` service closes that gap — it polls UIM at a low rate while a card is present (60 s idle, 5 s while searching), and when the card is believed absent it **pulses the `sim_hotplug` line** and re-checks every 6 s. On `absent → present` it waits for registration, forces ModemManager to re-read the SIM (`mmcli -d` + `-e`) so a different card's IMSI/APN reaches `qcom-carrier-autocfg`, then brings the bearer back up. Measured end to end: **~15 s** for a ~4 s swap (was ~35 s). `searching` alone never triggers anything, so a train or a cell reselection is not mistaken for a swap. QMI hygiene is preserved (`--device-open-proxy`, one short-lived client at a time, always under `timeout`) — no `ClientIdsExhausted`.
 
-**🏷️ HMU05 → HMUF02-V5 rename** — DTS, device profile, diffconfig, patch filenames and CI globs now say `hmuf02v5`. Backwards compatibility is preserved: `hmu05,250605v0s` stays in `SUPPORTED_DEVICES` (an older image can sysupgrade to this one) and the runtime board globs match both names. `uf02` remains a separate board.
+**🏷️ HMU05 → HMUF02-V5** — DTS, device profile, diffconfig, patch filenames and CI globs now say `hmuf02v5`. Backwards compatibility is intact: `hmu05,250605v0s` remains in `SUPPORTED_DEVICES` (an older image can sysupgrade to this one) and the on-device board globs match both names. `uf02` is a separate board and is unchanged.
 
-**🔢 Release identification** — the `version` file is the single source of truth, propagated by `sync-version.sh` into every diffconfig with `CONFIG_VERSIONOPT=y`. Images report the project version in `ubus call system board` and `/etc/os-release` instead of the stock OpenWrt one, and firmware filenames carry the `msm8916-openwrt-` prefix. This release reports **`25.12.5-r6`**.
+**🔢 Images now identify themselves** — the `version` file (`25.12.5-r6`) is the single source of truth, propagated by `sync-version.sh` into every diffconfig with `CONFIG_VERSIONOPT=y`. `ubus call system board` and `/etc/os-release` report the project version, and firmware filenames carry the `msm8916-openwrt-` prefix.
 
-**👥 Maintainer policy** — `CODEOWNERS` + `MAINTAINERS.md` route UZ801 and UFI003 to their board maintainer.
+**👥 Board maintainers** — new `CODEOWNERS` and `MAINTAINERS.md` route UZ801 and UFI003 to their board maintainer; everything else stays with the lead.
 
-**ℹ️ `--help` everywhere** — every custom on-device program now answers `-h/--help` with its options, the `uci` keys it honours, and the `logread` tag to watch. 18 of the 20 had nothing or only a bare usage line (including `diag-bind`, `diag-bind-watch`, `diag_nv`, `diag_efs`, `diag_logtool`, `modem-bearer-watchdog` and `sim-hotplug`). `diag_nv` moved its static binary to `/usr/libexec/diag_nv.bin` behind a wrapper.
+**ℹ️ `--help` everywhere** — every custom on-device program now answers `-h/--help` with its options, the `uci` keys it honours and the `logread` tag to watch. 18 of the 20 previously printed nothing or a bare usage line — including `diag-bind`, `diag-bind-watch`, `diag_nv`, `diag_efs`, `diag_logtool`, `modem-bearer-watchdog` and `sim-hotplug`. `diag_nv` moved its static binary to `/usr/libexec/diag_nv.bin` behind a wrapper.
 
-**🧪 Tested on HMUF02-V5 only** — `sysupgrade -n`, boot, modem attach + data, a physical card swap (~15 s, new IP, 0 % loss) and `--help` on every tool were verified live. The other boards (`ufi001b`, `ufi003`, `uz801`, `uf02`, `mf800b`) have not been rebuilt or flashed with this branch yet.
+**🧪 Tested on HMUF02-V5 only** — `sysupgrade -n`, boot, modem attach + data, a physical card swap (~15 s, new IP, 0 % loss) and `--help` on every tool were verified live. The other boards (`ufi001b`, `ufi003`, `uz801`, `uf02`, `mf800b`) compile from the same tree but have **not** been rebuilt or flashed with this branch yet — reports welcome.
 
-**⬆️ Upgrading** — A config-preserving `sysupgrade` from an older HMU05 image is accepted and keeps the overlay. `/etc/config/sim-hotplug` is new and gets its defaults on first boot.
+**⬆️ Upgrading** — a config-preserving `sysupgrade` from an older HMU05 image is accepted and keeps the overlay. `/etc/config/sim-hotplug` is new and receives its defaults on first boot. A swap shorter than the modem's own removal debounce is invisible by nature; `/etc/init.d/sim-hotplug rescan` forces a re-read.
 
 **📄 Full changeset** — [`Docs/HMUF02V5_BRANCH_CHANGESET.md`](Docs/HMUF02V5_BRANCH_CHANGESET.md).
 
