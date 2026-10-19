@@ -9,6 +9,43 @@
 # This watchdog detects genuine user-plane stalls (eNodeB DRB de-scheduling or
 # RF freeze) by monitoring wwan0 RX counters and WDS packet service status:
 
+# --- --help ---------------------------------------------------------------
+case "${1:-}" in
+	-h|--help)
+		cat <<'USAGE'
+Usage: modem-bearer-watchdog [--help]
+
+Passive LTE-native bearer watchdog.  Watches wwan0 RX counters and the QMI WDS
+packet-service state, reports new modem fatals, recovers a stuck bearer, and
+nudges a zombie modem (DMS offline / ModemManager dead) back online.  Started
+by procd (/etc/init.d/modem-bearer-watchdog); takes no arguments.
+
+Configuration (uci, section.option = default):
+  modem-watchdog.general.enabled                1
+  modem-watchdog.general.stall_timeout          30    (seconds)
+  modem-watchdog.general.check_interval         5     (seconds)
+  modem-watchdog.general.cooldown_seconds       60
+  modem-watchdog.general.mobile_optimized       0
+  modem-watchdog.general.auto_mobile            0
+  modem-watchdog.general.mobile_grace_secs      180
+  modem-watchdog.general.cell_poll_secs         15
+  modem-watchdog.keepalive.enabled              1
+  modem-watchdog.keepalive.interval             10
+  modem-watchdog.keepalive.target               1.1.1.1
+  modem-watchdog.recovery.bearer_down_recover_secs  30
+  modem-watchdog.recovery.zombie_nudge_secs     60
+  modem-watchdog.recovery.himi_ok_enabled       1
+  modem-watchdog.recovery.himi_ok_interval      20
+
+Options:
+  -h, --help   Show this help and exit
+
+Log:  logread -e modem-stall-watchdog
+USAGE
+		exit 0
+		;;
+esac
+
 LOCKFILE="/var/lock/modem-bearer.lock"
 
 # Modem remoteproc control node (used by Stage 3 SSR recovery)

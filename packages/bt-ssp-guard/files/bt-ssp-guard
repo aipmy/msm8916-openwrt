@@ -171,8 +171,31 @@ case "$1" in
 		# default action, also used by the boot init script
 		cmd_repair --wait
 		;;
+	-h|--help)
+		cat <<'USAGE'
+Usage: bt-ssp-guard {status|repair [--wait]} | -h|--help
+
+Keep the WCN36xx Bluetooth controller's Secure Simple Pairing LMP-feature bit
+set.  The bit lives in NVM tag 6 (byte 6, bit 3); when it is clear the
+controller answers "Read Simple Pairing Mode" with status 0x11 and BR/EDR
+pairing falls back to legacy PIN pairing, which also fails.  The BT NVM is
+RAM-only, so this runs every boot; in the normal case it is a silent no-op.
+
+Commands:
+  status          Report the feature bit and SSP mode; exit 0 when OK
+  repair          Check and rewrite NVM tag 6 when needed
+  repair --wait   Same, but poll for hci0 first (boot use)
+
+Options:
+  -h, --help   Show this help and exit
+
+Service:  /etc/init.d/bt-ssp-guard
+Log:      logread -e bt-ssp
+USAGE
+		exit 0
+		;;
 	*)
-		echo "usage: $PROG {status|repair [--wait]}" >&2
+		echo "usage: $PROG {status|repair [--wait]}  (see --help)" >&2
 		exit 2
 		;;
 esac

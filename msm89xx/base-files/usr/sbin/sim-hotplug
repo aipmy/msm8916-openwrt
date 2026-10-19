@@ -277,8 +277,36 @@ case "$arg" in
     start)
         [ "$ENABLED" -eq 1 ] && poll_loop
         ;;
-    *)
-        echo "usage: $0 [start|rescan]" >&2
-        exit 1
+    -h|--help)
+        cat <<'USAGE'
+Usage: sim-hotplug {start|rescan} | -h|--help
+
+Detect a physical SIM swap and re-announce the card to the baseband.
+
+The HMUF02-V5 has no AP-side card-detect line and the modem firmware has
+hotswap disabled: it notices a REMOVAL but never an INSERTION.  This service
+watches the modem's UIM card status and, while the card is believed absent,
+pulses the sim_hotplug line (GPIO114) so the baseband re-reads an inserted
+card.  It then waits for registration, makes ModemManager re-read the SIM
+(so a different card's IMSI/APN is picked up) and brings the bearer up.
+
+Commands:
+  start     Run the poll loop (used by procd)
+  rescan    Force one re-announce now (manual recovery)
+
+Options:
+  -h, --help   Show this help and exit
+
+Configuration (uci, /etc/config/sim-hotplug):
+  sim-hotplug.general.enabled          1
+  sim-hotplug.general.idle_interval    60   seconds between checks while registered
+  sim-hotplug.general.active_interval  5    seconds between checks while searching
+  sim-hotplug.general.absent_interval  6    seconds between re-announce cycles
+  sim-hotplug.general.pulse_ms         300  sim_hotplug pulse width
+
+Service:  /etc/init.d/sim-hotplug {start|stop|restart|status|rescan}
+Log:      logread -e sim-hotplug
+USAGE
+        exit 0
         ;;
 esac

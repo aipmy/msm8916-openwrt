@@ -21,6 +21,25 @@
 # An intentional "ifdown modem" does NOT count as a modem failure.
 #
 
+# --- --help ---------------------------------------------------------------
+case "${1:-}" in
+	-h|--help)
+		cat <<'USAGE'
+Usage: modem-led-monitor [--help]
+
+Drive the red status LED from modem health.  RED off = modem subsystem healthy;
+RED blinking = modem starting or unhealthy.  Healthy means: the MSS remoteproc
+exists and is running, wwan0qmi0 exists, and ModemManager sees the modem.  An
+intentional "ifdown modem" does not count as a failure.  Started by procd
+(/etc/init.d/modem-led-monitor); takes no arguments.
+
+Options:
+  -h, --help   Show this help and exit
+USAGE
+		exit 0
+		;;
+esac
+
 LED="/sys/class/leds/red:power"
 QMI="/sys/class/wwan/wwan0qmi0"
 MSS_NAME="4080000.remoteproc"

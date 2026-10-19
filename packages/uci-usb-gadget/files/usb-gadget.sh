@@ -535,11 +535,32 @@ case "${1:-}" in
     status)
         status
         ;;
+    -h|--help)
+        cat <<'USAGE'
+Usage: usb-gadget {start|stop|restart|status} | -h|--help
+
+Build, tear down or inspect the USB gadget described by /etc/config/usbgadget.
+All configuration lives in uci; this script only applies it.
+
+Commands:
+  start     (Re)build the gadget from the current uci config
+  stop      Tear the gadget down
+  restart   Tear down, then build again
+  status    Show the configured functions and the live UDC state
+
+Options:
+  -h, --help   Show this help and exit
+
+Configuration:
+  uci show usbgadget
+  uci set usbgadget.<section>.<option>=<value> && uci commit usbgadget
+
+Service:  /etc/init.d/usb-gadget {start|stop|restart|status}
+USAGE
+        exit 0
+        ;;
     *)
-        echo "Usage: $0 {start|stop|restart|status}"
-        echo ""
-        echo "Universal USB Gadget Manager for OpenWrt"
-        echo "Configure via: uci set usbgadget.<option>=<value>"
+        echo "Usage: $0 {start|stop|restart|status}  (see --help)" >&2
         exit 1
         ;;
 esac

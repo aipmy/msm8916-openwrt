@@ -15,6 +15,32 @@
 # well-formed PEM public key, and the on-disk key is only replaced when it
 # actually differs (so we do not churn the overlay on every boot).
 
+# --- --help ---------------------------------------------------------------
+case "${1:-}" in
+	-h|--help)
+		cat <<'USAGE'
+Usage: apk-key-refresh [--help]
+
+Fetch the akbar-npj package-feed signing key from the canonical URL and install
+it in /etc/apk/keys when it differs from the copy on disk.  Run at boot by
+procd (/etc/init.d/apk-key-refresh) so a device carrying a stale key self-heals
+without a reflash.
+
+Environment overrides:
+  KEY_URL    key URL                (default: the project's public-key.pem)
+  KEY_FILE   install path           (default: /etc/apk/keys/akbar-npj-v25.12.5.pem)
+  RETRIES    attempts at boot       (default 15)
+  DELAY      seconds between tries  (default 20)
+
+Options:
+  -h, --help   Show this help and exit
+
+Log:  logread -e apk-key-refresh
+USAGE
+		exit 0
+		;;
+esac
+
 KEY_URL="${KEY_URL:-https://akbar-npj.github.io/msm8916-openwrt/public-key.pem}"
 KEY_FILE="${KEY_FILE:-/etc/apk/keys/akbar-npj-v25.12.5.pem}"
 TMP_FILE="/tmp/.apk-key-refresh.$$"

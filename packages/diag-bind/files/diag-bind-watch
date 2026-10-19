@@ -13,6 +13,31 @@
 # open is never disturbed. /usr/sbin/diag-bind is itself idempotent, so a call
 # while already bound is a no-op.
 
+# --- --help ---------------------------------------------------------------
+case "${1:-}" in
+	-h|--help)
+		cat <<'USAGE'
+Usage: diag-bind-watch [--help]
+
+Keep the SMD DIAG <-> rpmsg_chrdev bridge alive.  Binds once at start, then
+polls and re-runs the idempotent "diag-bind" whenever the DIAG device exists but
+is unbound (which happens on every SSR).  It only acts when unbound, so a
+capture holding /dev/rpmsg0 open is never disturbed.  Started by procd
+(/etc/init.d/diag-bind); takes no arguments.
+
+Environment:
+  DIAG_BIND_INTERVAL   poll interval in seconds (default 2)
+
+Options:
+  -h, --help   Show this help and exit
+
+Status:  /root/diag-bind.status   (state=<state>, time=<iso>, detail)
+Log:     logread -e diag-bind
+USAGE
+		exit 0
+		;;
+esac
+
 BUS=/sys/bus/rpmsg
 DRV=rpmsg_chrdev
 DIAG=remoteproc0:smd-edge.DIAG.-1.-1

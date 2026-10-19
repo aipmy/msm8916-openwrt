@@ -273,6 +273,33 @@ int main(int argc, char **argv)
 	struct sockaddr_rc addr;
 	int s;
 
+	if (argc >= 2 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help"))) {
+		printf(
+"Usage: %s serve   --channel N --bridge shell|tcp [--tcp-host H --tcp-port P]\n"
+"       %s connect --bdaddr AA:BB:CC:DD:EE:FF --channel N\n"
+"                   --bridge shell|tcp [--tcp-port P]\n"
+"       %s -h|--help\n"
+"\n"
+"Bluetooth SPP server/client for the WCN36xx controller.  Bridges an RFCOMM\n"
+"serial channel to a local shell (--bridge shell) or to a TCP socket\n"
+"(--bridge tcp).  Usually started by /etc/init.d/bt-spp.\n"
+"\n"
+"Commands:\n"
+"  serve     Open an RFCOMM server on --channel and wait for a peer\n"
+"  connect   Dial a peer at --bdaddr on --channel\n"
+"\n"
+"Options:\n"
+"  --channel N        RFCOMM channel (default 1)\n"
+"  --bridge MODE      shell | tcp   (default shell)\n"
+"  --tcp-host H       TCP host for --bridge tcp (default 127.0.0.1)\n"
+"  --tcp-port P       TCP port for --bridge tcp (default 5000)\n"
+"  -h, --help         Show this help and exit\n"
+"\n"
+"Configuration: uci show bt-spp   (bridge, channel, tcp_port, ...)\n"
+"Log:           logread -e bt-spp\n",
+			argv[0], argv[0], argv[0]);
+		return 0;
+	}
 	if (argc < 2)
 		usage();
 

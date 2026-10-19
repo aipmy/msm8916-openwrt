@@ -4,6 +4,32 @@
 # re-running, and trigger a reboot. Accepts optional 'MCFG_PATH'
 # env var to override the MCFG relative path within modem/persist.
 
+# --- --help ---------------------------------------------------------------
+case "${1:-}" in
+	-h|--help)
+		cat <<'USAGE'
+Usage: msm-firmware-dumper [--help]
+
+One-shot extraction of the Qualcomm modem/Wi-Fi firmware from the stock
+partitions into /lib/firmware.  Runs at first boot, writes a marker, and
+reboots once; on later boots it exits immediately.  Started by procd
+(/etc/init.d/msm-firmware-dumper); takes no arguments.
+
+Environment overrides:
+  FLAG        marker file           (default /lib/firmware/DUMPED)
+  MCFG_PATH   MCFG path inside the modem/persist image
+                                    (default image/modem_pr/mcfg/configs/mcfg_sw/
+                                     generic/common/row/gen_3gpp)
+
+Options:
+  -h, --help   Show this help and exit
+
+Log:  logread -e msm-fw-dumper
+USAGE
+		exit 0
+		;;
+esac
+
 set -e
 DEFAULT_FLAG="/lib/firmware/DUMPED"
 DEFAULT_MCFG_PATH="image/modem_pr/mcfg/configs/mcfg_sw/generic/common/row/gen_3gpp"

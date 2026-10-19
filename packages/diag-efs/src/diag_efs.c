@@ -604,6 +604,40 @@ static int dump_rec(const char *rpath, const char *lpath, int depth) {
 }
 
 int main(int argc, char **argv) {
+    if (argc >= 2 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help"))) {
+        printf(
+"Usage: %s <command> [args]\n"
+"\n"
+"Read and write the modem's EFS2 filesystem over the SMD DIAG channel\n"
+"(/dev/rpmsg0).  The modem decrypts its own EFS on the fly, so this shows the\n"
+"live NV tree without needing the per-chip storage key.\n"
+"\n"
+"Commands:\n"
+"  list [path]                  List a directory (default /)\n"
+"  stat <path>                  Show mode and size\n"
+"  get <path>                   Hex-dump a file to stdout\n"
+"  read <path> <local>          Copy a file to a local path\n"
+"  put <local> <efs-path> [--force] [--oflag N]\n"
+"                               Write a local file into EFS (refuses calibration\n"
+"                               paths without --force; verifies by read-back)\n"
+"  dump <path> <dir>            Recursively copy a tree to <dir>\n"
+"  detect                       Probe which EFS method the modem uses\n"
+"\n"
+"Options:\n"
+"  -h, --help                   Show this help and exit\n"
+"\n"
+"Environment:\n"
+"  EFS_READCMD                  Override the EFS read opcode\n"
+"\n"
+"Requires the DIAG bridge: run 'diag-bind' first (or the diag-bind service).\n"
+"\n"
+"Examples:\n"
+"  %s detect\n"
+"  %s list /nv/item_files\n"
+"  %s get /nv/item_files/modem/mmode/ue_usage_setting\n",
+            argv[0], argv[0], argv[0], argv[0]);
+        return 0;
+    }
     if (argc < 2) {
         fprintf(stderr,
             "usage:\n"

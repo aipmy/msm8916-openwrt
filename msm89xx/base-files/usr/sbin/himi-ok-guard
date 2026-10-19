@@ -39,6 +39,33 @@
 #   himi_ok_interval  default 20  -- seconds between checks
 #   (the board gate lives in /lib/himi-ok.sh)
 
+# --- --help ---------------------------------------------------------------
+case "${1:-}" in
+	-h|--help)
+		cat <<'USAGE'
+Usage: himi-ok-guard [--help]
+
+Keep modem NV item 2500 (NV_FACTORY_DATA_4_I) equal to "HiMI_OK".
+
+The modem's RF task reads that item and memcmp()s it against "HiMI_OK"; when it
+does not match it takes the "get imei will stop" branch that leads to the ~900 s
+ML1 fatal.  The item is cleared at every modem boot, so it is re-written shortly
+after each one.  Only an ALL-ZERO item is written: a non-zero item may be real
+factory data on a non-HiMI modem.
+
+Configuration (uci):
+  modem-watchdog.recovery.himi_ok_enabled    default 1
+  modem-watchdog.recovery.himi_ok_interval   default 20  (seconds)
+
+Options:
+  -h, --help   Show this help and exit
+
+Log:  logread -e himi-ok-guard
+USAGE
+		exit 0
+		;;
+esac
+
 DEV=/dev/rpmsg0
 NV=/usr/sbin/diag_nv
 ITEM=2500

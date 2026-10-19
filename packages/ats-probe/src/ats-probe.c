@@ -291,6 +291,7 @@ static void usage(const char *argv0)
 		"  -n  stop after this many samples (default 0 = until signalled)\n"
 		"  -o  append-safe output file (default stdout)\n"
 		"  -q  suppress the human-readable startup banner\n"
+		"  -h  show this help and exit\n"
 		"\n"
 		"Reads the modem's own ATS_RTC uptime over QMI TIME (service %d) and\n"
 		"stamps each read with the AP's CLOCK_BOOTTIME. Sends only the 14-byte\n"

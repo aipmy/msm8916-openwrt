@@ -24,6 +24,33 @@
 # The kernel guard patch (rpmsg-char-guard-null-eptdev) protects that and IS in
 # the running kernel -- verified: the built source has `if (!eptdev) return 0;`.
 
+# --- --help ---------------------------------------------------------------
+case "${1:-}" in
+	-h|--help)
+		cat <<'USAGE'
+Usage: diag-bind [--help]
+
+(Re)establish the Qualcomm SMD DIAG <-> rpmsg_chrdev bridge and print the nodes
+in use:
+
+    DIAG=/dev/rpmsgN
+    CNTL=/dev/rpmsgM
+
+Every SSR and every AP reboot destroys the rpmsg device the binding lived on, so
+run this before a DIAG capture (or let /etc/init.d/diag-bind keep it bound).
+Idempotent: re-running while already bound is a no-op.
+
+Exit status: 0 when both endpoints exist and are open, non-zero otherwise.
+
+Options:
+  -h, --help   Show this help and exit
+
+Log:  logread -e diag-bind
+USAGE
+		exit 0
+		;;
+esac
+
 set -u
 BUS=/sys/bus/rpmsg
 DRV=rpmsg_chrdev

@@ -743,6 +743,40 @@ static int cmd_cntl_dump(const char *path) {
 }
 
 int main(int argc, char **argv) {
+    if (argc >= 2 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help"))) {
+        printf(
+"Usage: %s <command> [args]\n"
+"\n"
+"Raw DIAG tool: send commands and capture the modem's log (F3) stream over the\n"
+"SMD DIAG channels (/dev/rpmsg0 data, DIAG_CNTL for control).\n"
+"\n"
+"Commands:\n"
+"  selftest                     Open the DIAG port and report what it finds\n"
+"  raw <hexbytes>               Send raw bytes, print the reply\n"
+"  req <hexbytes> <expect_code> Send and match the reply code (skips F3)\n"
+"  hdlc <hexbytes> <expect_code> [lead]\n"
+"                               HDLC-framed request (for DIAG_CMD)\n"
+"  listen <seconds>             Print incoming messages for N seconds\n"
+"  capture <seconds> <file>     Capture the F3 stream to <file>\n"
+"  capture-send <seconds> <file> <hex>\n"
+"                               Send <hex> first, then capture\n"
+"  log-config <op>              Read/apply the modem log configuration\n"
+"  log-enable | log-disable     Turn the log stream on/off\n"
+"  set-mask <equip> <nitems> <maskhex>\n"
+"  get-mask <equip>             Per-equipment log mask\n"
+"  cntl-enable [dev] [nssid]    Enable the control channel (default 1 SSID)\n"
+"  cntl-enable-range [dev] [nssid]\n"
+"                               Same, one F3_MASK packet per 256 SSIDs\n"
+"  cntl-disable [dev]           Disable the control channel\n"
+"  cntl-dump [dev]              Dump the control channel state\n"
+"\n"
+"Options:\n"
+"  -h, --help                   Show this help and exit\n"
+"\n"
+"Requires the DIAG bridge: run 'diag-bind' first (or the diag-bind service).\n",
+            argv[0]);
+        return 0;
+    }
     if (argc < 2) {
         fprintf(stderr,
             "usage:\n"

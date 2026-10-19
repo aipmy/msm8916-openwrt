@@ -958,6 +958,27 @@ static void handle_qrtr_packet(int sock, void *buf, size_t len,
 	}
 }
 
+static void usage(const char *prog)
+{
+	fprintf(stderr,
+		"Usage: %s [-v] [-p] [-r <refresh_sec>] [-i <interval_sec>] [-P <ats_state_file>]\n"
+		"\n"
+		"Qualcomm QMI Time synchronization daemon: anchors the modem ATS/SCLK to the\n"
+		"host clock before LTE attach.  Normally started by\n"
+		"/etc/init.d/qcom-time-daemon.\n"
+		"\n"
+		"Options:\n"
+		"  -v  verbose logging\n"
+		"  -p  enable the READ-ONLY modem-uptime poll (0x0021 GET only; no 0x0020 write)\n"
+		"  -r  periodic ATS_USER WRITE (0x0020) every <refresh_sec>; 0 = off (Android parity)\n"
+		"  -i  poll interval in seconds (default %d, minimum 5)\n"
+		"  -P  persistent ATS record path (default %s); \"none\" disables it\n"
+		"  -h  show this help and exit\n"
+		"\n"
+		"Log: logread -e qcom-time-daemon\n",
+		prog, poll_interval, DEFAULT_ATS_STATE_FILE);
+}
+
 int main(int argc, char *argv[])
 {
 	struct pollfd pfd;
@@ -966,7 +987,7 @@ int main(int argc, char *argv[])
 	int sock;
 	int ret;
 
-	while ((opt = getopt(argc, argv, "vpr:i:P:")) != -1) {
+	while ((opt = getopt(argc, argv, "vpr:i:P:h")) != -1) {
 		switch (opt) {
 		case 'v':
 			verbose = true;
@@ -1008,11 +1029,11 @@ int main(int argc, char *argv[])
 				ats_state_file = optarg;
 			}
 			break;
+		case 'h':
+			usage(argv[0]);
+			return 0;
 		default:
-			fprintf(stderr, "Usage: %s [-v] [-p] [-r <refresh_sec>] [-i <interval_sec>] [-P <ats_state_file>]\n", argv[0]);
-			fprintf(stderr, "  -p  enable the READ-ONLY modem-uptime poll (0x0021 GET only; no 0x0020 write)\n");
-			fprintf(stderr, "  -r  enable the periodic ATS_USER WRITE (0x0020) every <refresh_sec>; 0 = off (Android parity)\n");
-			fprintf(stderr, "  -P  persistent ATS record path (default %s); \"none\" disables it\n", DEFAULT_ATS_STATE_FILE);
+			usage(argv[0]);
 			return 1;
 		}
 	}

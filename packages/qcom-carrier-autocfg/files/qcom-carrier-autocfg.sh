@@ -5,6 +5,33 @@
 # IP stack (IPv4/IPv6), and establishes high-stability connection.
 #
 
+# --- --help ---------------------------------------------------------------
+case "${1:-}" in
+	-h|--help)
+		cat <<'USAGE'
+Usage: qcom-carrier-autocfg [--help]
+
+Carrier auto-provisioning daemon.  Polls ModemManager for the SIM's operator
+and IMSI, looks the carrier up in /usr/share/qcom-carrier-autocfg/apns.tsv
+(overridable per operator in /etc/qcom-carrier-autocfg/custom-apns.tsv), then
+sets the APN / IP type / allowed mode / bands in /etc/config/network and brings
+the modem interface up.  Re-runs on a SIM swap.  Started by procd
+(/etc/init.d/qcom-carrier-autocfg); takes no arguments.
+
+Files:
+  /usr/share/qcom-carrier-autocfg/apns.tsv        shipped carrier table
+  /etc/qcom-carrier-autocfg/custom-apns.tsv       local overrides
+  /etc/qcom-carrier-autocfg/stored-imsi           last provisioned IMSI
+
+Options:
+  -h, --help   Show this help and exit
+
+Log:  logread -e carrier-autocfg
+USAGE
+		exit 0
+		;;
+esac
+
 TAG="carrier-autocfg"
 LAST_OPERATOR_CODE=""
 LAST_IMSI=""

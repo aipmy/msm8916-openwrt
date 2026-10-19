@@ -1,5 +1,22 @@
 #!/bin/sh
 
+# --- --help ---------------------------------------------------------------
+case "${1:-}" in
+	-h|--help)
+		cat <<'USAGE'
+Usage: wifi-led-monitor [--help]
+
+Drive the green WLAN LED: off when the AP interface (phy0-ap0) has no client,
+on when it has one, blinking while the AP is coming up.  Started by procd
+(/etc/init.d/wifi-led-monitor); takes no arguments.
+
+Options:
+  -h, --help   Show this help and exit
+USAGE
+		exit 0
+		;;
+esac
+
 LED="/sys/class/leds/green:wlan"
 [ -d "$LED" ] || LED="/sys/class/leds/green:wan"
 WIFI_IF="phy0-ap0"
