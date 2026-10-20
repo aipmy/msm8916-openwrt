@@ -146,6 +146,12 @@ Patch `805`: GPIO114 is now a `gpio-leds` node
 (`/sim-presence/sim_hotplug`) instead of a `gpio-hog`, exposing
 `/sys/class/leds/sim_hotplug/brightness` exactly like stock Android.
 
+> **Board scope.** This node exists **only in the HMUF02-V5 DTS**. The other
+> boards (`uz801`, `ufi001b`, `ufi003`, `uf02`, `mf800b`) have no
+> `sim_hotplug` line, so hot-swap is **not implemented** there. The service
+> still ships in the shared `base-files` but cannot pulse on those boards.
+> Full detail: [`Docs/SIM_HOT_SWAP.md`](SIM_HOT_SWAP.md).
+
 ### 4.6 Known limitation
 
 A swap shorter than the modem's own removal debounce can be **invisible**: the

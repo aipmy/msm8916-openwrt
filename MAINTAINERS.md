@@ -5,13 +5,23 @@ who keeps its device-tree patches and config current, tests release candidates
 on real hardware, and reviews PRs that touch their board. The lead owns the
 shared build pipeline and the device table.
 
-## Branch protection
+## Branch protection and review flow
 
-- `main` is branch-protected. **No direct pushes** — everything goes through a
-  Pull Request + review.
-- Maintainers are given **Write** access so they can push topic branches and
-  self-merge their own board PRs after review.
-- GitHub routes board-specific files to the right owner via `CODEOWNERS`.
+- `main` takes changes **only via Pull Request**. Direct `git push` to `main`
+  is rejected by GitHub — the PR-review gate implies "require a pull request
+  before merging". The "Shell test suites" CI check must pass.
+- **The lead (@akbar-npj) is the final approver on every PR.** `CODEOWNERS`
+  lists `@akbar-npj` on every line (each board's files *and* the `*` fallback),
+  so `require_code_owner_reviews: true` makes the lead a *required* reviewer for
+  all files. A board maintainer reviews their own board's changes, but the PR
+  cannot merge until the lead also approves.
+- `enforce_admins: false` — the lead is not bound by the gate, so they can
+  approve and merge their own PRs (and any PR) through the normal PR flow.
+  Non-admin collaborators (`Write`) cannot bypass the required reviews.
+- Board maintainers get **Write** access so they can push their own topic / test
+  branches (e.g. `uz801/test`), experiment there, and open PRs — but they cannot
+  merge to `main` without the lead's approval. Stale approvals are dismissed on
+  new pushes (`dismiss_stale_reviews: true`).
 
 ## Roster
 

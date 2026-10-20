@@ -10,14 +10,14 @@
 # owner listed below.
 
 # --- UZ801 (maintained by @isprogrammer) ---
-msm89xx/patches/803-arm64-dts-qcom-uz801-leds-and-button.patch  @isprogrammer
+msm89xx/patches/803-arm64-dts-qcom-uz801-leds-and-button.patch  @isprogrammer @akbar-npj
 msm89xx/patches/851-arm64-dts-qcom-uf02-uz801-a2-pin.patch      @isprogrammer @akbar-npj
 msm89xx/image/msm8916.mk                                        @akbar-npj
 
 # --- UFI003 (maintained by @isprogrammer) ---
-msm89xx/patches/852-arm64-dts-qcom-add-msm8916-generic-ufi003.patch  @isprogrammer
-diffconfigs/ufi003                                               @isprogrammer
+msm89xx/patches/852-arm64-dts-qcom-add-msm8916-generic-ufi003.patch  @isprogrammer @akbar-npj
+diffconfigs/ufi003                                               @isprogrammer @akbar-npj
 
 # --- UZ801 config + everything else defaults to the lead ---
-diffconfigs/uz801  @isprogrammer
+diffconfigs/uz801  @isprogrammer @akbar-npj
 *  @akbar-npj
