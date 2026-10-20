@@ -171,10 +171,22 @@ bring_up_bearer() {
 }
 
 poll_loop() {
-    local removed=0 last now st u iv miss=0
+	local removed=0 last now st u iv miss=0
 
-    # Let ModemManager finish enumerating before the first query.
-    sleep 10
+	# Without a writable sim_hotplug line, hot-swap can never make the modem
+	# re-read the slot, so the absent-reannounce loop would spin forever with
+	# no way to recover an insertion.  The init script already skips the
+	# service in that case; this guards the direct `sim-hotplug start` path.
+	if [ ! -w "$SIM_LED" ]; then
+		log "no writable sim_hotplug line on this board - hot-swap disabled, monitoring only"
+		while true; do
+			sleep "$IDLE_INTERVAL"
+			uim_state >/dev/null 2>&1
+		done
+	fi
+
+	# Let ModemManager finish enumerating before the first query.
+	sleep 10
 
     u=$(uim_state)
     case "$u" in
