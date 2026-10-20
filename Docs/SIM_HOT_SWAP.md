@@ -116,10 +116,19 @@ re-initialise UIM when data fails.
 
 Only patch **805** currently defines `/sim-presence/sim_hotplug`
 (`gpios = <&tlmm 114 GPIO_ACTIVE_HIGH>`). The service ships in the
-shared `base-files` and is `enabled 1` on every board. On a board
-with no writable `/sys/class/leds/sim_hotplug/brightness`,
-`pulse_sim` fails, so the service keeps polling UIM but can never
-re-announce an inserted card.
+shared `base-files` and is `enabled 1` on every board.
+
+> **Node gate (not in release r6).** As shipped, `sim-hotplug` starts on
+> every board and only `pulse_sim` checks for the line. On a board with no
+> writable `/sys/class/leds/sim_hotplug/brightness`, `pulse_sim` fails, so a
+> card-less or card-lost board spins the absent-reannounce loop forever (a
+> UIM check every ~6 s and a log line every ~30 s) and can never recover an
+> insertion. A fix is drafted that **gates the service on the node**: the init
+> script skips cleanly (`logger: no sim_hotplug line on this board - disabled`)
+> when the line is absent, `rescan` becomes a no-op, and the direct-start path
+> idles instead of spinning. Until that lands, the only effect on other boards
+> is wasted QMI polls and log spam — hot-swap is simply inert there. Boards
+> that *do* expose the node are unaffected and self-activate the gate.
 
 ## Testing on another board
 
