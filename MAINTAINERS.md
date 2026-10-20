@@ -7,11 +7,21 @@ shared build pipeline and the device table.
 
 ## Branch protection
 
-- `main` is branch-protected. **No direct pushes** — everything goes through a
-  Pull Request + review.
+- `main` is branch-protected. **Merges require a reviewed Pull Request** —
+  the `required_pull_request_reviews` gate is on, with
+  `require_code_owner_reviews: true` and `required_approving_review_count: 1`,
+  and `enforce_admins: true` (the lead is gated too). The "Shell test suites"
+  CI check must also pass.
+- **Code-owner reviews are blocking.** A PR touching a board's files (per
+  `CODEOWNERS`) cannot merge until that board's maintainer approves; shared
+  files route to the lead. Stale approvals are dismissed on new pushes.
+- **Direct pushes:** GitHub does **not** support push restrictions on a
+  user-owned repository, so `git push` straight to `main` is not mechanically
+  blocked. The standing policy is **do not push directly** — always merge via a
+  reviewed PR. (On an organization repo this could be hardened with a push
+  `restrictions` allow-list.)
 - Maintainers are given **Write** access so they can push topic branches and
   self-merge their own board PRs after review.
-- GitHub routes board-specific files to the right owner via `CODEOWNERS`.
 
 ## Roster
 
