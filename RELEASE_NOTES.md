@@ -44,7 +44,7 @@
 
 **📄 Watchdog & mobility guide** — new [`Docs/Modem Stability/MODEM_BEARER_WATCHDOG.md`](Docs/Modem%20Stability/MODEM_BEARER_WATCHDOG.md) explains the `auto_mobile` profile, its config knobs, and how to tune handover behaviour.
 
-**🧪 Tested only on HMU05 — your testing is needed** — The mobility profile and the LuCI app were validated **only on the HMU05** (a ~20-minute city drive, zero spurious stalls). The other boards (`ufi001b`, `uz801` v3, `uf02`, `mf800b`, `ufi003`) compile from the same tree but have **not** been drive-tested on this release. If you run one of them — or any setup different from the default — please flash it and **report back**: which board, what you exercised (boot, Wi-Fi, Bluetooth, modem attach + data, a drive test), and the result. Positive confirmations are as useful as failures — please open an issue.
+**🧪 Tested only on HMU05 — your testing is needed** — The mobility profile and the LuCI app were validated **only on the HMU05** (a ~20-minute city drive, zero spurious stalls). The other boards (`ufi001b`, `uz801` v3, `uf02`, `mf800b`, `ufi003`) compile from the same tree but have **not** been drive-tested on this release. If you run one of them — or any setup different from the default — please flash it and **report back**: which board, what you exercised (boot, Wi-Fi, Bluetooth where an antenna is fitted, modem attach + data, a drive test), and the result. Positive confirmations are as useful as failures — please open an issue.
 
 **⬆️ Upgrading** — From r4: `sysupgrade` (keep config) is fine and preserves the overlay. The new watchdog options default sensibly, so an existing `modem-watchdog` config carries over unchanged.
 
@@ -62,7 +62,7 @@
 
 **🛡️ Modem stability** — The HiMI_OK guard is now gated for **UF02** as well (the third confirmed board), and the guard's init ships as an rc.d symlink so it survives `sysupgrade`.
 
-**🧪 Tested only on HMU05 — your testing is needed** — This build has been validated **only on the HMU05**. The failsafe mode was verified live on HMU05; the other boards (`ufi001b`, `uz801` v3, `uf02`, `mf800b`) compile from the same tree but have **not** been tested on this release. If you run one of them — or any HMU05 setup different from the default — please flash it and **report back**: which board, what you exercised (boot, Wi-Fi, Bluetooth, modem attach + data, failsafe), and the result. Positive confirmations are as useful as failures — please open an issue so we can fold findings into the next release.
+**🧪 Tested only on HMU05 — your testing is needed** — This build has been validated **only on the HMU05**. The failsafe mode was verified live on HMU05; the other boards (`ufi001b`, `uz801` v3, `uf02`, `mf800b`) compile from the same tree but have **not** been tested on this release. If you run one of them — or any HMU05 setup different from the default — please flash it and **report back**: which board, what you exercised (boot, Wi-Fi, Bluetooth where an antenna is fitted, modem attach + data, failsafe), and the result. Positive confirmations are as useful as failures — please open an issue so we can fold findings into the next release.
 
 **⬆️ Upgrading** — From r3: `sysupgrade` (keep config) is fine and preserves the overlay.
 
@@ -83,7 +83,7 @@
 - **HiMI_OK guard hardened (GitHub issue #5).** The root-cause fix for the ~900 s baseband deadline: it rewrites the `HiMI_OK` handshake after every modem boot, gated to HiMI baseband boards, and only writes when NV item 2500 reads all-zeros. DIAG rpmsg access is now serialized and the diag-bind-watch no longer rewrites the status file every 2 s.
 - **Corrected A2-parity claim.** Earlier docs described Android parity as `a2_pin=0`; measured behaviour shows Android actually holds the A2 ON (`a2_pin=1`). HMU05 now ships `a2_pin=1` via device-tree, matching Android.
 
-**🔵 Bluetooth (new)** — BlueZ userspace shipped in the image; `kmod-btqca` + `kmod-btqcomsmd` packaged. `bt-ssp-guard` fixes SSP pairing by gating on the NVM LMP-feature bit; bond persists across reboot (verified). `bt-spp` adds an SPP serial server (default-on) + on-demand client with a uci bridge.
+**🔵 Bluetooth (new)** — BlueZ userspace shipped in the image; `kmod-btqca` + `kmod-btqcomsmd` packaged. `bt-ssp-guard` fixes SSP pairing by gating on the NVM LMP-feature bit; bond persists across reboot (verified). `bt-spp` adds an SPP serial server (default-on) + on-demand client with a uci bridge. Bluetooth is not usable on UZ801 v3 because the board has no Bluetooth antenna.
 
 **📶 Wi-Fi (new)** — **WPA3-SAE / 802.11w (MFP)** enabled on wcn36xx (firmware already supported PMF/IGTK; only the driver needed patching). **AP-only interface combinations** allow multiple SSIDs (up to 2 APs) on one radio — do NOT enable STA+AP concurrent mode (it crashes the WCNSS firmware). Wi-Fi thermal mitigation wired up (wcn36xx HAL thermal command + cooling device).
 
