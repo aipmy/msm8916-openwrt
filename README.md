@@ -34,7 +34,7 @@ Recent additions on top of the base port:
 * **📟 Built-in USB Serial Console**: Instant root shell on `/dev/ttyACM0` (115200 baud) over USB via CDC ACM for zero-setup terminal access, debugging, and recovery.
 * **📶 First-Boot Wi-Fi Auto-Start**: Automatically extracts Qualcomm WCNSS blobs, starts the remoteproc in-place, binds the physical radio path, and broadcasts an open `OpenWrt` 2.4 GHz AP (Channel 1, 2.412 GHz) on clean first boot.
 * **🔐 WPA3-SAE and Multi-SSID**: The wcn36xx driver advertises WPA3-SAE (PMF/IGTK), and the radio can host **two AP interfaces** at once. See [Wi-Fi](#-wi-fi).
-* **🔵 Bluetooth + Serial Port Profile**: WCNSS Bluetooth over SMD with BlueZ 5.83, an SSP pairing-repair guard, and an SPP server/client for a Bluetooth serial console or TCP bridge. See [Bluetooth](#-bluetooth).
+* **🔵 Bluetooth + Serial Port Profile**: WCNSS Bluetooth over SMD with BlueZ 5.83, an SSP pairing-repair guard, and an SPP server/client for a Bluetooth serial console or TCP bridge. Bluetooth is not usable on UZ801 v3 because that board has no Bluetooth antenna. See [Bluetooth](#-bluetooth).
 * **🌡️ Thermal & Power Management**: Mainline **CPR** CPU-rail scaling (Android-parity voltage), an 800 MHz CPU OPP cap, and Wi-Fi/PMIC thermal mitigation on the HMUF02-V5. See [Thermal & Power Management](#-thermal--power-management).
 * **🛡️ Modem Stability Guard**: The A2 power rail is pinned on (`a2_pin=1`), the modem's `HiMI_OK` NV marker is rewritten after every modem boot, and `modem-bearer-watchdog` performs pre-emptive SSR recovery. See [Modem Stability](#-modem-stability).
 * **🌐 4G LTE Cellular Data & Carrier Auto-Provisioning**: Native **ModemManager** integration with automatic SIM carrier detection (`qcom-carrier-autocfg`), dynamic APN and Qualcomm Carrier MBN deployment, safe empty PLMN home operator attachment, and continuous self-healing daemon monitoring (`modem-led-monitor`).
@@ -71,9 +71,11 @@ Recent additions on top of the base port:
 | `hmuf02v5`   |      ✅       |    ✅     |          ✅           |          ✅           |           ✅            |         ✅          |         ✅         |
 | `ufi001b` |      ✅       |    ✅     |          ✅           |          ✅           |           —             |         —           |         —          |
 | `ufi003`  |      ✅       |    ✅     |          ✅           |          ✅           |           —             |         —           |         —          |
-| `uz801`   |      ✅       |    ✅     |          ✅           |          ✅           |           —             |         ✅          |         —          |
+| `uz801`   |      ✅       |    ❌     |          ✅           |          ✅           |           —             |         ✅          |         —          |
 | `uf02`    |      ✅       |    ✅     |          ✅           |          ✅           |           —             |         ✅          |         —          |
 | `mf800b`  |      ✅       |    ✅     |          ✅           |          ✅           |           —             |         —           |         —          |
+
+* UZ801 v3 has no Bluetooth antenna; its image includes the software, but Bluetooth is unavailable on that board.
 
 > The Wi-Fi/PMIC cooling maps are **HMUF02-V5-only** (device-tree gated). The `a2_pin` modem-rail hold is enabled on the **HMUF02-V5, UZ801 and UF02** boards — all three carry the same HiMI baseband family (`HIMI_U01_MODEM_V1.0`) exposed to the `a2_power.c:1189` quiesce wedge; `UFI003`, `UFI001B` (modem `MPSS.DPM.2.0.2`, V2.0) and `MF800B` do not set it. Everything else applies to every board. Failsafe mode is enabled on **every board** (LED colour varies by board); it has been **live-verified on the HMUF02-V5** only.
 
@@ -335,6 +337,8 @@ The WCN36xx 2.4 GHz radio comes up automatically on first boot and broadcasts an
 ## 🔵 Bluetooth
 
 The device's Bluetooth controller is the WCNSS core reached over the SMD transport (`kmod-btqcomsmd` + `kmod-btqca`), with **BlueZ 5.83** userspace (`bluetoothd`, `bluetoothctl`, `hcitool`, `btmgmt`, `rfcomm`, `sdptool`, `bt-agent`).
+
+> **UZ801 v3 hardware limitation:** This board has no Bluetooth antenna. The Bluetooth software is present in its image, but Bluetooth cannot be used as a normal over-the-air feature on UZ801 v3.
 
 Bring up the controller and pair from the console:
 
