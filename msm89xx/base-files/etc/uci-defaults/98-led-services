@@ -10,8 +10,9 @@ if [ -d /sys/class/leds/red:power ] &&
     [ -x /etc/init.d/modem-led-monitor ] &&
         /etc/init.d/modem-led-monitor enable
 
-    [ -x /etc/init.d/wifi-led-monitor ] &&
-        /etc/init.d/wifi-led-monitor enable
+    # wifi-led-monitor disabled: green LED is reserved for WAN (wwan0) via netdev trigger
+    # [ -x /etc/init.d/wifi-led-monitor ] &&
+    #    /etc/init.d/wifi-led-monitor enable
 fi
 
 exit 0

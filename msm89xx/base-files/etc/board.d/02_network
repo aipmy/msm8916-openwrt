@@ -9,8 +9,43 @@ board_config_update
 # MSM8916 4G USB dongles operate as Wi-Fi / USB router without eth0
 ucidef_set_interface_lan "usb0"
 ucidef_set_country "US"
-ucidef_set_wireless "all" "OpenWrt" "none"
+ucidef_set_hostname "ModemRadar"
+
+# Read Factory NVRAM Wi-Fi MAC Address to generate unique SSID: Modem 4G - <3 uppercase chars>
+FACTORY_MAC=""
+for p in /dev/disk/by-partlabel/persist /dev/mmcblk0p6 /dev/mmcblk0p24; do
+	if [ -b "$p" ]; then
+		mkdir -p /tmp/mnt_persist
+		if mount -t ext4 -o ro "$p" /tmp/mnt_persist 2>/dev/null || mount -o ro "$p" /tmp/mnt_persist 2>/dev/null; then
+			[ -f /tmp/mnt_persist/wcnss_mac_addr ] && FACTORY_MAC="$(cat /tmp/mnt_persist/wcnss_mac_addr 2>/dev/null)"
+			umount /tmp/mnt_persist 2>/dev/null || true
+		fi
+		rmdir /tmp/mnt_persist 2>/dev/null || true
+		[ -n "$FACTORY_MAC" ] && break
+	fi
+done
+
+MAC_CLEAN="$(echo "$FACTORY_MAC" | tr -d ':\r\n ' | tr '[:lower:]' '[:upper:]')"
+if [ -n "$MAC_CLEAN" ] && [ "${#MAC_CLEAN}" -ge 3 ]; then
+	MAC_SUFFIX="$(echo -n "$MAC_CLEAN" | tail -c 3)"
+else
+	MAC_SUFFIX="4G"
+fi
+
+WIFI_SSID="Modem 4G - $MAC_SUFFIX"
+
+ucidef_set_wireless "all" "$WIFI_SSID" "psk2" "1234567890"
 
 board_config_flush
+
+# Update model name in board.json
+ucode -e '
+	let fs = require("fs");
+	let board = json(fs.readfile("/etc/board.json"));
+	if (board?.model) {
+		board.model.name = "ModemRadar 4G LTE Gateway";
+		fs.writefile("/etc/board.json", sprintf("%J\n", board));
+	}
+' 2>/dev/null || true
 
 exit 0

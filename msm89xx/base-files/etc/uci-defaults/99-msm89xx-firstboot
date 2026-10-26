@@ -111,15 +111,69 @@ set usbgadget.acm.shell='1'
 EOF
 
 ###############################################################################
-# Per-board hostname
-#
-# Every board would otherwise be called "OpenWrt", which makes it impossible
-# to tell several boards apart on the network.  board_name is the first DT
-# compatible string (e.g. "hmuf02v5,250605v0s"); keep the model part only.
+# Hostname configuration
 ###############################################################################
 
-BOARD="$(cut -d, -f1 /tmp/sysinfo/board_name 2>/dev/null)"
-[ -n "$BOARD" ] && uci set system.@system[0].hostname="$BOARD"
+uci set system.@system[0].hostname="ModemRadar"
+echo "ModemRadar" > /proc/sys/kernel/hostname 2>/dev/null || true
+
+###############################################################################
+# Hardware LED Configuration (LAN & WAN netdev link/tx/rx)
+###############################################################################
+
+uci -q batch << 'EOF'
+set system.led_lan='led'
+set system.led_lan.name='LAN'
+set system.led_lan.sysfs='blue:wlan'
+set system.led_lan.trigger='netdev'
+set system.led_lan.dev='br-lan'
+set system.led_lan.mode='link tx rx'
+
+set system.led_wan='led'
+set system.led_wan.name='WAN'
+set system.led_wan.sysfs='green:wan'
+set system.led_wan.trigger='netdev'
+set system.led_wan.dev='wwan0'
+set system.led_wan.mode='link tx rx'
+commit system
+EOF
+
+###############################################################################
+# Set Proton2025 as default LuCI theme
+###############################################################################
+
+uci -q set luci.main.mediaurlbase='/luci-static/proton2025'
+
+###############################################################################
+# Configure Web Terminal (ttyd auto-login root)
+###############################################################################
+
+uci -q batch << 'EOF'
+set ttyd.@ttyd[0].command='/bin/login -f root'
+commit ttyd
+EOF
+
+###############################################################################
+# Configure Default TTL Spoofing / Fix (TTL 64 for Hotspot Bypass)
+###############################################################################
+
+cat << 'EOF' > /etc/firewall.ttl
+table inet fw4 {
+    chain mangle_forward_ttl {
+        type filter hook forward priority mangle; policy accept;
+        ip ttl set 64
+        ip6 hoplimit set 64
+    }
+}
+EOF
+
+uci -q batch << 'EOF'
+add firewall include
+set firewall.@include[-1].path='/etc/firewall.ttl'
+set firewall.@include[-1].type='nftables'
+set firewall.@include[-1].position='ruleset-append'
+commit firewall
+EOF
 
 uci commit
 

@@ -57,6 +57,15 @@
 		}
 	},
 
+	"admin/modem/luci-app-sms-manager/sms_manager_call": {
+		"title": "Voice Call / Dialer",
+		"order": 45,
+		"action": {
+			"type": "view",
+			"path": "modem/sms_manager_call"
+		}
+	},
+
 	"admin/modem/luci-app-sms-manager/sms_manager_config": {
 		"title": "Configuration",
 		"order": 50,

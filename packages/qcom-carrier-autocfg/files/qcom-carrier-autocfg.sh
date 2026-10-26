@@ -54,7 +54,7 @@ lookup_carrier_profile() {
 	# Defaults
 	CARRIER_NAME="Generic"
 	CARRIER_APN="internet"
-	CARRIER_IPTYPE="ipv4v6"
+	CARRIER_IPTYPE="ipv4"
 	CARRIER_AUTH="none"
 	CARRIER_MODE="4g"
 	CARRIER_MBN="generic/common/row/gen_3gpp/mcfg_sw.mbn"
@@ -158,7 +158,7 @@ lookup_carrier_profile() {
 			CARRIER_APN="internet"
 		fi
 		CARRIER_NAME="Generic"
-		CARRIER_IPTYPE="ipv4v6"
+		CARRIER_IPTYPE="ipv4"
 		CARRIER_MODE="4g"
 		CARRIER_MBN="generic/common/row/gen_3gpp/mcfg_sw.mbn"
 	fi

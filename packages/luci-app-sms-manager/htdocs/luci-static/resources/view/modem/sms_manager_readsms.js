@@ -353,9 +353,25 @@ return view.extend({
 					E('th', { 'class': 'th message' }, _('Message'))
 				])
 			]);
+
+			let storageInfo = E('td', { 
+				'class': 'td left',
+				'id': 'storage-info',
+				'style': 'padding:10px; text-align:left!important; vertical-align:top!important; border-top:1px solid var(--border-color-medium)!important;'
+			}, [ 
+				E('span', {'class': 'spinning'}, _('Loading...'))
+			]);
+
+			function updateStorage(sim, mem) {
+				let txt = 'SIM: ' + (sim || 0) + ' / Memory: ' + (mem || 0);
+				storageInfo.textContent = txt;
+				let el = document.getElementById('storage-info');
+				if (el) el.textContent = txt;
+			}
 			
 			if (!modemPath) {
 				ui.addNotification(null, E('p', _('Please configure the SMS reading modem first')), 'info');
+				updateStorage(0, 0);
 			} else {
 				let modemNum = modemPath.split('/').pop();
 				
@@ -369,6 +385,7 @@ return view.extend({
 								)
 							]);
 							smsTable.appendChild(emptyRow);
+							updateStorage(0, 0);
 							return;
 						}
 						
@@ -388,6 +405,13 @@ return view.extend({
 								)
 							]);
 							smsTable.appendChild(emptyRow);
+							updateStorage(0, 0);
+							uci.load('sms_manager').then(function() {
+								try {
+									uci.set('sms_manager', '@sms_manager[0]', 'sms_count', '0');
+									uci.save();
+								} catch (e) {}
+							});
 							return;
 						}
 						
@@ -478,10 +502,7 @@ return view.extend({
 								return b.date - a.date;
 							});
 							
-							let storageInfo = document.getElementById('storage-info');
-							if (storageInfo) {
-								storageInfo.innerHTML = 'SIM: ' + simCount + ' / Memory: ' + memoryCount;
-							}
+							updateStorage(simCount, memoryCount);
 							
 							return uci.load('sms_manager').then(function() {
 								try {
@@ -535,10 +556,12 @@ return view.extend({
 								});
 							});
 						}).catch(function(err) {
+							updateStorage(0, 0);
 							ui.addNotification(null, E('p', _('Error loading SMS details: ') + err.message), 'error');
 						});
 					})
 					.catch(function(err) {
+						updateStorage(0, 0);
 						ui.addNotification(null, E('p', _('Error listing SMS: ') + err.message), 'error');
 					});
 			}
@@ -568,13 +591,7 @@ return view.extend({
 							'class': 'td left',
 							'style': 'width:33%; padding:10px; text-align:left!important; vertical-align:top!important; border-top:1px solid var(--border-color-medium)!important;'
 						}, [ _('Storage SM / ME used') ]),
-						E('td', { 
-							'class': 'td left',
-							'id': 'storage-info',
-							'style': 'padding:10px; text-align:left!important; vertical-align:top!important; border-top:1px solid var(--border-color-medium)!important;'
-						}, [ 
-							E('span', {'class': 'spinning'}, _('Loading...'))
-						])
+						storageInfo
 					])
 				]),
 

@@ -1,0 +1,7 @@
+#!/bin/sh
+[ "$ACTION" = "add" ] || exit 0
+case "$DEVICENAME" in
+    wwan0|br-lan)
+        /etc/init.d/led reload
+        ;;
+esac

@@ -1,5 +1,13 @@
 # MCC_MNC	Operator_Name	APN	IP_Type	Mode	MBN_Path
 # ----------------------------------------------------------------------------------------------------------------------
+# Indonesia (MCC 510)
+51010	Telkomsel	internet	ipv4	4g	generic/common/row/gen_3gpp/mcfg_sw.mbn
+51001	Indosat Ooredoo Hutchison	indosatgprs	ipv4	4g	generic/common/row/gen_3gpp/mcfg_sw.mbn
+51089	Three (Indosat)	3data	ipv4	4g	generic/common/row/gen_3gpp/mcfg_sw.mbn
+51011	XL Axiata	internet	ipv4	4g	generic/common/row/gen_3gpp/mcfg_sw.mbn
+51009	Smartfren	smartfren4G	ipv4	4g	generic/common/row/gen_3gpp/mcfg_sw.mbn
+51028	Smartfren	smartfren4G	ipv4	4g	generic/common/row/gen_3gpp/mcfg_sw.mbn
+
 # Nepal (MCC 429)
 42901	Nepal Telecom (NTC / Namaste)	ntnet	ipv4v6	4g	generic/common/row/gen_3gpp/mcfg_sw.mbn
 42902	Ncell (Axiata)	web	ipv4v6	4g	generic/common/row/gen_3gpp/mcfg_sw.mbn

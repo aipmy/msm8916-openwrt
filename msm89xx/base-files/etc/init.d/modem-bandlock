@@ -1,0 +1,22 @@
+#!/bin/sh /etc/rc.common
+# Qualcomm MSM8916 Persistent LTE Band Locking Daemon
+
+START=90
+USE_PROCD=1
+
+start_service() {
+	local bands
+	bands=$(uci -q get network.modem.bands)
+	[ -n "$bands" ] && [ "$bands" != "all" ] || return 0
+
+	(
+		for i in $(seq 1 30); do
+			if mmcli -m any >/dev/null 2>&1; then
+				logger -t modem-bandlock "Applying persistent LTE band lock: $bands"
+				mmcli -m any --set-current-bands="$bands" >/dev/null 2>&1
+				break
+			fi
+			sleep 1
+		done
+	) &
+}

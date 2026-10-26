@@ -1,0 +1,38 @@
+{
+	"luci-modem-tools": {
+		"description": "Grant access to Modem tools, Band Lock & Speedtest",
+		"read": {
+			"file": {
+				"/usr/bin/mmcli": [ "exec" ],
+				"/usr/sbin/modem-speedtest": [ "exec" ]
+			},
+			"ubus": {
+				"luci.proton-system": [
+					"getSignalDetails",
+					"getTTL",
+					"setTTL",
+					"setBandLock",
+					"startSpeedtest",
+					"getSpeedtestStatus",
+					"getSpeedtestHistory",
+					"cancelSpeedtest",
+					"clearSpeedtestHistory"
+				]
+			}
+		},
+		"write": {
+			"file": {
+				"/usr/bin/mmcli": [ "exec" ],
+				"/usr/sbin/modem-speedtest": [ "exec" ]
+			},
+			"ubus": {
+				"luci.proton-system": [
+					"setBandLock",
+					"startSpeedtest",
+					"cancelSpeedtest",
+					"clearSpeedtestHistory"
+				]
+			}
+		}
+	}
+}

@@ -1,0 +1,15 @@
+{
+	"luci-vpn-clients": {
+		"description": "Grant access to VPN client dashboard",
+		"read": {
+			"ubus": {
+				"network.interface": [ "dump", "status" ],
+				"service": [ "list" ]
+			},
+			"uci": [ "network", "openvpn" ]
+		},
+		"write": {
+			"uci": [ "network", "openvpn" ]
+		}
+	}
+}

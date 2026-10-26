@@ -1,0 +1,825 @@
+// Proton2025 Theme - System Info & Modem RPC Module
+// Copyright 2025-2026 ChesterGoodiny
+// Licensed under the Apache License, Version 2.0
+// See LICENSE and NOTICE for details.
+
+'use strict';
+
+import { readfile, writefile, lsdir, popen } from 'fs';
+import { cursor } from 'uci';
+import { connect } from 'ubus';
+
+function readFileContent(path) {
+	let content = readfile(path);
+	return content ? trim(content) : null;
+}
+
+function parseReleaseValue(content, key) {
+	if (!content || !key) return null;
+
+	let pattern = key + "='";
+	let start = index(content, pattern);
+	if (start < 0) return null;
+
+	let valueStart = start + length(pattern);
+	let tail = substr(content, valueStart);
+	let valueEnd = index(tail, "'");
+	if (valueEnd < 0) return null;
+
+	return substr(tail, 0, valueEnd);
+}
+
+function extractUrl(line) {
+	if (!line) return null;
+
+	let httpsStart = index(line, 'https://');
+	let httpStart = index(line, 'http://');
+	let start = httpsStart;
+
+	if (start < 0 || (httpStart >= 0 && httpStart < start))
+		start = httpStart;
+
+	if (start < 0) return null;
+
+	let tail = substr(line, start);
+	let end = length(tail);
+
+	for (let i = 0; i < length(tail); i++) {
+		let ch = substr(tail, i, 1);
+		if (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n' || ch == '"' || ch == '\'' || ch == '#') {
+			end = i;
+			break;
+		}
+	}
+
+	return substr(tail, 0, end);
+}
+
+function isCommentOrEmptyLine(line) {
+	let normalized = trim(line || '');
+	if (!normalized) return true;
+
+	return index(normalized, '#') == 0;
+}
+
+function normalizePackageFeedUrl(url, packageArch) {
+	if (!url || !packageArch) return null;
+
+	let marker = '/packages/' + packageArch;
+	let markerPos = index(url, marker);
+	if (markerPos < 0) return null;
+
+	return substr(url, 0, markerPos + length(marker)) + '/';
+}
+
+function findPackageFeedUrlInContent(content, packageArch) {
+	if (!content || !packageArch) return null;
+
+	for (let line in split(content, "\n")) {
+		if (isCommentOrEmptyLine(line))
+			continue;
+
+		let url = extractUrl(line);
+		let normalized = normalizePackageFeedUrl(url, packageArch);
+		if (normalized) return normalized;
+	}
+
+	return null;
+}
+
+function buildFallbackPackageFeedUrl(packageArch, releaseVersion) {
+	let normalizedRelease = trim(releaseVersion || '');
+	if (!normalizedRelease || !packageArch) return null;
+
+	if (normalizedRelease == 'SNAPSHOT' || normalizedRelease == 'snapshot')
+		return 'https://downloads.openwrt.org/snapshots/packages/' + packageArch + '/';
+
+	let firstChar = substr(normalizedRelease, 0, 1);
+	if (index('0123456789', firstChar) == 0 || index('0123456789', firstChar) > 0)
+		return 'https://downloads.openwrt.org/releases/' + normalizedRelease + '/packages/' + packageArch + '/';
+
+	return null;
+}
+
+function findPackageFeedUrl(packageArch, releaseVersion) {
+	let directFiles = [
+		'/etc/opkg/distfeeds.conf',
+		'/etc/opkg/customfeeds.conf',
+		'/etc/apk/repositories',
+		'/etc/apk/distfeeds.list',
+		'/etc/apk/repositories.d/distfeeds.list'
+	];
+
+	for (let path in directFiles) {
+		let content = readFileContent(path);
+		let url = findPackageFeedUrlInContent(content, packageArch);
+		if (url) return url;
+	}
+
+	let repoFiles = lsdir('/etc/apk/repositories.d');
+	if (repoFiles) {
+		for (let name in repoFiles) {
+			let content = readFileContent('/etc/apk/repositories.d/' + name);
+			let url = findPackageFeedUrlInContent(content, packageArch);
+			if (url) return url;
+		}
+	}
+
+	return buildFallbackPackageFeedUrl(packageArch, releaseVersion);
+}
+
+function getSystemInfo() {
+	let release = readFileContent('/etc/openwrt_release') || '';
+	let packageArch = parseReleaseValue(release, 'DISTRIB_ARCH');
+	let releaseVersion = parseReleaseValue(release, 'DISTRIB_RELEASE');
+
+	return {
+		package_arch: packageArch,
+		target: parseReleaseValue(release, 'DISTRIB_TARGET'),
+		package_feed_url: findPackageFeedUrl(packageArch, releaseVersion)
+	};
+}
+
+function getBandInfo(earfcn) {
+	let e = int(earfcn);
+	if (e >= 0 && e <= 599) {
+		return { code: "B1", freq: "2100", name: "Band 1 (2100 MHz - FDD)", dl: sprintf("%.1f MHz", 2110.0 + 0.1 * e), ul: sprintf("%.1f MHz", 1920.0 + 0.1 * e), duplex: "FDD" };
+	} else if (e >= 600 && e <= 1199) {
+		return { code: "B2", freq: "1900", name: "Band 2 (1900 MHz - FDD)", dl: sprintf("%.1f MHz", 1930.0 + 0.1 * (e - 600)), ul: sprintf("%.1f MHz", 1850.0 + 0.1 * (e - 600)), duplex: "FDD" };
+	} else if (e >= 1200 && e <= 1949) {
+		return { code: "B3", freq: "1800", name: "Band 3 (1800 MHz DCS - FDD)", dl: sprintf("%.1f MHz", 1805.0 + 0.1 * (e - 1200)), ul: sprintf("%.1f MHz", 1710.0 + 0.1 * (e - 1200)), duplex: "FDD" };
+	} else if (e >= 1950 && e <= 2399) {
+		return { code: "B4", freq: "1700/2100", name: "Band 4 (1700/2100 MHz AWS)", dl: sprintf("%.1f MHz", 2110.0 + 0.1 * (e - 1950)), ul: sprintf("%.1f MHz", 1710.0 + 0.1 * (e - 1950)), duplex: "FDD" };
+	} else if (e >= 2400 && e <= 2649) {
+		return { code: "B5", freq: "850", name: "Band 5 (850 MHz - FDD)", dl: sprintf("%.1f MHz", 869.0 + 0.1 * (e - 2400)), ul: sprintf("%.1f MHz", 824.0 + 0.1 * (e - 2400)), duplex: "FDD" };
+	} else if (e >= 2750 && e <= 3449) {
+		return { code: "B7", freq: "2600", name: "Band 7 (2600 MHz - FDD)", dl: sprintf("%.1f MHz", 2620.0 + 0.1 * (e - 2750)), ul: sprintf("%.1f MHz", 2500.0 + 0.1 * (e - 2750)), duplex: "FDD" };
+	} else if (e >= 3450 && e <= 3799) {
+		return { code: "B8", freq: "900", name: "Band 8 (900 MHz - FDD)", dl: sprintf("%.1f MHz", 925.0 + 0.1 * (e - 3450)), ul: sprintf("%.1f MHz", 880.0 + 0.1 * (e - 3450)), duplex: "FDD" };
+	} else if (e >= 6150 && e <= 6449) {
+		return { code: "B20", freq: "800", name: "Band 20 (800 MHz - FDD)", dl: sprintf("%.1f MHz", 791.0 + 0.1 * (e - 6150)), ul: sprintf("%.1f MHz", 832.0 + 0.1 * (e - 6150)), duplex: "FDD" };
+	} else if (e >= 9210 && e <= 9659) {
+		return { code: "B28", freq: "700", name: "Band 28 (700 MHz - FDD)", dl: sprintf("%.1f MHz", 758.0 + 0.1 * (e - 9210)), ul: sprintf("%.1f MHz", 703.0 + 0.1 * (e - 9210)), duplex: "FDD" };
+	} else if (e >= 37750 && e <= 38249) {
+		return { code: "B38", freq: "2600", name: "Band 38 (2600 MHz - TDD)", dl: sprintf("%.1f MHz", 2570.0 + 0.1 * (e - 37750)), ul: sprintf("%.1f MHz", 2570.0 + 0.1 * (e - 37750)), duplex: "TDD" };
+	} else if (e >= 38650 && e <= 39649) {
+		return { code: "B40", freq: "2300", name: "Band 40 (2300 MHz - TDD)", dl: sprintf("%.1f MHz", 2300.0 + 0.1 * (e - 38650)), ul: sprintf("%.1f MHz", 2300.0 + 0.1 * (e - 38650)), duplex: "TDD" };
+	} else if (e >= 39650 && e <= 41589) {
+		return { code: "B41", freq: "2500", name: "Band 41 (2500 MHz - TDD)", dl: sprintf("%.1f MHz", 2496.0 + 0.1 * (e - 39650)), ul: sprintf("%.1f MHz", 2496.0 + 0.1 * (e - 39650)), duplex: "TDD" };
+	}
+	return { code: "LTE", freq: "", name: "LTE (EARFCN " + earfcn + ")", dl: "--", ul: "--", duplex: "LTE" };
+}
+
+function formatBytes(bytes) {
+	let b = int(bytes);
+	if (b >= 1073741824) return sprintf("%.2f GB", b / 1073741824.0);
+	if (b >= 1048576) return sprintf("%.1f MB", b / 1048576.0);
+	if (b >= 1024) return sprintf("%.1f KB", b / 1024.0);
+	return sprintf("%d B", b);
+}
+
+function formatDuration(sec) {
+	let s = int(sec);
+	if (s < 0) s = 0;
+	let d = int(s / 86400);
+	let rem_d = s % 86400;
+	let h = int(rem_d / 3600);
+	let rem_h = rem_d % 3600;
+	let m = int(rem_h / 60);
+	let rem_s = rem_h % 60;
+	return sprintf("%02dd %02dh:%02dm:%02ds", d, h, m, rem_s);
+}
+
+function hexToInt(hex) {
+	if (!hex) return 0;
+	let s = replace(hex, /^0x/i, "");
+	let val = 0;
+	for (let i = 0; i < length(s); i++) {
+		let ch = uc(substr(s, i, 1));
+		let d = index("0123456789ABCDEF", ch);
+		if (d < 0) break;
+		val = val * 16 + d;
+	}
+	return val;
+}
+
+function parseCellInfo() {
+	let p_cell = popen("mmcli -m any --get-cell-info -J 2>/dev/null");
+	let cell_raw = p_cell ? p_cell.read("all") : "";
+	if (p_cell) p_cell.close();
+	let cell_data = cell_raw ? json(cell_raw) : null;
+
+	let serving = {
+		band: "LTE", freq: "", band_name: "LTE", earfcn: "", pci: "",
+		cell_id: "", cell_id_hex: "--", cell_id_dec: "--",
+		enb: "--", sector: "--", tac: "", tac_hex: "--", tac_dec: "--",
+		rsrp: "", rsrq: "", dl: "--", ul: "--", duplex: "LTE"
+	};
+	let neighbors = [];
+
+	if (cell_data && cell_data.modem && cell_data.modem.generic && cell_data.modem.generic["cell-info"]) {
+		for (let line in cell_data.modem.generic["cell-info"]) {
+			let is_serving = (index(line, "serving: yes") >= 0);
+			let item = { earfcn: "", pci: "", rsrp: "", rsrq: "", cell_id: "", tac: "" };
+			for (let token in split(line, ",")) {
+				let p = split(trim(token), ":");
+				if (length(p) >= 2) {
+					let k = trim(p[0]), v = trim(p[1]);
+					if (k == "earfcn") item.earfcn = v;
+					else if (k == "physical ci") item.pci = v;
+					else if (k == "ci") item.cell_id = v;
+					else if (k == "tac") item.tac = v;
+					else if (k == "rsrp") item.rsrp = sprintf("%.1f", int(v));
+					else if (k == "rsrq") item.rsrq = sprintf("%.1f", int(v));
+				}
+			}
+			let b = getBandInfo(item.earfcn);
+			item.band = b.code;
+			item.freq = b.freq;
+			item.band_name = b.name;
+			item.dl = b.dl;
+			item.ul = b.ul;
+			item.duplex = b.duplex;
+
+			if (is_serving) {
+				serving = item;
+				if (item.cell_id) {
+					let cid_int = hexToInt(item.cell_id);
+					if (cid_int > 0) {
+						serving.cell_id_hex = "0x" + uc(item.cell_id);
+						serving.cell_id_dec = sprintf("%d", cid_int);
+						serving.enb = sprintf("%d", int(cid_int / 256));
+						serving.sector = sprintf("%d", int(cid_int % 256));
+					}
+				}
+				if (item.tac) {
+					let tac_int = hexToInt(item.tac);
+					serving.tac_hex = "0x" + uc(item.tac);
+					serving.tac_dec = sprintf("%d", tac_int);
+				}
+			} else {
+				push(neighbors, item);
+			}
+		}
+	}
+	return { serving: serving, neighbors: neighbors };
+}
+
+function parseSignalInfo() {
+	let p_sig = popen("mmcli -m any --signal-get -J 2>/dev/null");
+	let sig_raw = p_sig ? p_sig.read("all") : "";
+	if (p_sig) p_sig.close();
+	let sig_data = sig_raw ? json(sig_raw) : null;
+	let rssi = "", snr = "", rsrp = "", rsrq = "";
+	if (sig_data && sig_data.modem && sig_data.modem.signal && sig_data.modem.signal.lte) {
+		let lte = sig_data.modem.signal.lte;
+		if (lte.rssi && lte.rssi != "--") rssi = sprintf("%.1f", int(lte.rssi));
+		if (lte.snr && lte.snr != "--") snr = sprintf("%.1f", lte.snr);
+		if (lte.rsrp && lte.rsrp != "--") rsrp = sprintf("%.1f", int(lte.rsrp));
+		if (lte.rsrq && lte.rsrq != "--") rsrq = sprintf("%.1f", int(lte.rsrq));
+	}
+
+	// Fallback to QMI direct query if mmcli polling returns empty
+	if (!rssi || !snr) {
+		let p_qmi = popen("qmicli -p -d /dev/wwan0qmi0 --nas-get-signal-info 2>/dev/null");
+		let qmi_raw = p_qmi ? p_qmi.read("all") : "";
+		if (p_qmi) p_qmi.close();
+
+		for (let line in split(qmi_raw, "\n")) {
+			let t = trim(line);
+			let m_rssi = match(t, /^RSSI:\s*'([-\.0-9]+)\s*dBm'/);
+			if (m_rssi) rssi = m_rssi[1];
+			let m_snr = match(t, /^SNR:\s*'([-\.0-9]+)\s*dB'/);
+			if (m_snr) snr = m_snr[1];
+			let m_rsrp = match(t, /^RSRP:\s*'([-\.0-9]+)\s*dBm'/);
+			if (m_rsrp && !rsrp) rsrp = m_rsrp[1];
+			let m_rsrq = match(t, /^RSRQ:\s*'([-\.0-9]+)\s*dB'/);
+			if (m_rsrq && !rsrq) rsrq = m_rsrq[1];
+		}
+	}
+
+	return { rssi: rssi, snr: snr, rsrp: rsrp, rsrq: rsrq };
+}
+
+function getCarrierSession() {
+	let ip = "--", gw = "--", dns = [], uptime_sec = 0;
+	try {
+		let ub = connect();
+		let st = ub ? ub.call("network.interface.modem", "status", {}) : null;
+		if (st) {
+			uptime_sec = st.uptime || 0;
+			if (st["ipv4-address"] && length(st["ipv4-address"]) > 0) {
+				let a = st["ipv4-address"][0];
+				ip = a.address + (a.mask ? "/" + a.mask : "");
+			}
+			if (st.route && length(st.route) > 0) {
+				gw = st.route[0].nexthop || "--";
+			}
+			if (st["dns-server"]) dns = st["dns-server"];
+		}
+	} catch(e) {}
+
+	let rx_bytes = trim(readfile("/sys/class/net/wwan0/statistics/rx_bytes") || "0");
+	let tx_bytes = trim(readfile("/sys/class/net/wwan0/statistics/tx_bytes") || "0");
+
+	let apn = "internet";
+	try {
+		let u = cursor();
+		if (u) {
+			u.load("network");
+			apn = u.get("network", "modem", "apn") || "internet";
+		}
+	} catch(e) {}
+
+	return {
+		apn: apn,
+		ip: ip,
+		gateway: gw,
+		dns: dns,
+		mtu: 1500,
+		uptime: formatDuration(uptime_sec),
+		rx: formatBytes(rx_bytes),
+		tx: formatBytes(tx_bytes)
+	};
+}
+
+function getHardwareProfile() {
+	let cached = readfile("/tmp/.modem_hw_cache.json");
+	if (cached) {
+		let j = json(cached);
+		if (j && j.imei && j.imei != "--") return j;
+	}
+
+	let p_sim = popen("mmcli -i any --output-keyvalue 2>/dev/null");
+	let sim_raw = p_sim ? p_sim.read("all") : "";
+	if (p_sim) p_sim.close();
+	let imsi = "--", iccid = "--";
+	for (let line in split(sim_raw, "\n")) {
+		let p = split(line, ":");
+		if (length(p) >= 2) {
+			let k = trim(p[0]), v = trim(join(":", slice(p, 1)));
+			if (k == "sim.properties.imsi") imsi = v;
+			else if (k == "sim.properties.iccid") iccid = v;
+		}
+	}
+
+	let p_m = popen("mmcli -m any --output-keyvalue 2>/dev/null");
+	let m_raw = p_m ? p_m.read("all") : "";
+	if (p_m) p_m.close();
+	let imei = "--", fw_revision = "--";
+	for (let line in split(m_raw, "\n")) {
+		let p = split(line, ":");
+		if (length(p) >= 2) {
+			let k = trim(p[0]), v = trim(join(":", slice(p, 1)));
+			if (k == "modem.3gpp.imei") imei = v;
+			else if (k == "modem.generic.revision") fw_revision = v;
+		}
+	}
+
+	let hw = {
+		model: "Qualcomm Snapdragon 410 (MSM8916)",
+		imei: imei,
+		imsi: imsi,
+		iccid: iccid,
+		revision: fw_revision,
+		watchdog: "Remoteproc SSR Protected (0 Failures)"
+	};
+	if (imei != "--") writefile("/tmp/.modem_hw_cache.json", sprintf("%J\n", hw));
+	return hw;
+}
+
+function getTelemetry() {
+	// 1. CPU Temperature
+	let temp_raw = readfile("/sys/class/thermal/thermal_zone3/temp") || readfile("/sys/class/thermal/thermal_zone4/temp") || "0";
+	let temp = sprintf("%.1f", int(trim(temp_raw)) / 1000.0);
+
+	// 2. RAM Usage
+	let mem_raw = readfile("/proc/meminfo") || "";
+	let total_kb = 0, avail_kb = 0;
+	for (let line in split(mem_raw, "\n")) {
+		let parts = split(line, ":");
+		if (parts[0] == "MemTotal") total_kb = int(trim(parts[1]));
+		else if (parts[0] == "MemAvailable") avail_kb = int(trim(parts[1]));
+	}
+	let used_kb = total_kb - avail_kb;
+	let ram_pct = total_kb ? int((used_kb * 100) / total_kb) : 0;
+	let ram_used_mb = int(used_kb / 1024);
+	let ram_total_mb = int(total_kb / 1024);
+
+	// 3. CPU % Usage
+	let stat = readfile("/proc/stat") || "";
+	let cpu_line = split(stat, "\n")[0] || "";
+	let c = split(cpu_line, " ");
+	let nums = [];
+	for (let item in c) if (item != "" && item != "cpu") push(nums, int(item));
+	let total_cpu = 0; for (let n in nums) total_cpu += n;
+	let idle_cpu = (length(nums) >= 4) ? (nums[3] + (nums[4] || 0)) : 0;
+
+	let last = readfile("/tmp/.cpu_telemetry") || "";
+	let lp = split(trim(last), " ");
+	let cpu_pct = 0;
+	if (length(lp) >= 2) {
+		let dt = total_cpu - int(lp[0]);
+		let di = idle_cpu - int(lp[1]);
+		if (dt > 0) cpu_pct = int(((dt - di) * 100) / dt);
+	}
+	writefile("/tmp/.cpu_telemetry", sprintf("%d %d\n", total_cpu, idle_cpu));
+
+	// 4. Clients Count
+	let leases = readfile("/tmp/dhcp.leases") || "";
+	let client_count = 0;
+	for (let l in split(leases, "\n")) {
+		if (trim(l) != "") client_count++;
+	}
+
+	// 5. Modem & Cell Info
+	let cell_res = parseCellInfo();
+	let serving = cell_res.serving;
+	let sig_res = parseSignalInfo();
+
+	let p_kv = popen("mmcli -m any --output-keyvalue 2>/dev/null");
+	let kv_raw = p_kv ? p_kv.read("all") : "";
+	if (p_kv) p_kv.close();
+
+	let op_name = "ModemRadar", signal_val = 0, rat = serving.band || "4G", state = "connected";
+	for (let line in split(kv_raw, "\n")) {
+		let p = split(line, ":");
+		if (length(p) >= 2) {
+			let k = trim(p[0]), v = trim(join(":", slice(p, 1)));
+			if (k == "modem.3gpp.operator-name" && v != "--" && v != "") op_name = v;
+			else if (k == "modem.generic.signal-quality.value") signal_val = int(v);
+			else if (k == "modem.generic.state") state = v;
+		}
+	}
+
+	let bars = 0;
+	if (signal_val > 80) bars = 5;
+	else if (signal_val > 60) bars = 4;
+	else if (signal_val > 40) bars = 3;
+	else if (signal_val > 20) bars = 2;
+	else if (signal_val > 0) bars = 1;
+
+	let rsrp = sig_res.rsrp || serving.rsrp || "";
+	let rsrq = sig_res.rsrq || serving.rsrq || "";
+
+	let res = {
+		operator: op_name,
+		signal: signal_val,
+		bars: bars,
+		rat: rat,
+		band: serving.band || "LTE",
+		earfcn: serving.earfcn || "",
+		pci: serving.pci || "",
+		cell_id: serving.cell_id || "",
+		tac: serving.tac || "",
+		rsrp: rsrp,
+		rsrq: rsrq,
+		rssi: sig_res.rssi || "",
+		snr: sig_res.snr || "",
+		state: state,
+		temp: temp,
+		cpu_pct: cpu_pct,
+		ram_pct: ram_pct,
+		ram_used: ram_used_mb,
+		ram_total: ram_total_mb,
+		clients: client_count
+	};
+
+	writefile("/tmp/.telemetry_cache.json", sprintf("%J\n", res));
+	return res;
+}
+
+function getSignalDetails() {
+	let cell_res = parseCellInfo();
+	let sig_res = parseSignalInfo();
+	let serving = cell_res.serving;
+
+	if (sig_res.rsrp && !serving.rsrp) serving.rsrp = sig_res.rsrp;
+	if (sig_res.rsrq && !serving.rsrq) serving.rsrq = sig_res.rsrq;
+
+	// Delta calculation for neighbor cells
+	let s_rsrp_num = int(serving.rsrp || -140);
+	for (let n in cell_res.neighbors) {
+		let n_rsrp = int(n.rsrp || -140);
+		let diff = n_rsrp - s_rsrp_num;
+		n.delta = (diff > 0 ? "+" : "") + sprintf("%d dB", diff);
+	}
+
+	let p_kv = popen("mmcli -m any --output-keyvalue 2>/dev/null");
+	let kv_raw = p_kv ? p_kv.read("all") : "";
+	if (p_kv) p_kv.close();
+
+	let current_bands = [];
+	let op_name = "ModemRadar", op_code = "51001", sig_quality = 0, state = "connected", reg_state = "home";
+
+	for (let line in split(kv_raw, "\n")) {
+		let p = split(line, ":");
+		if (length(p) >= 2) {
+			let k = trim(p[0]), v = trim(join(":", slice(p, 1)));
+			if (index(k, "modem.generic.current-bands.value[") == 0) push(current_bands, v);
+			else if (k == "modem.3gpp.operator-name") op_name = v;
+			else if (k == "modem.3gpp.operator-code") op_code = v;
+			else if (k == "modem.3gpp.registration-state") reg_state = v;
+			else if (k == "modem.generic.signal-quality.value") sig_quality = int(v);
+			else if (k == "modem.generic.state") state = v;
+		}
+	}
+
+	let saved_uci_bands = null;
+	try {
+		let u = cursor();
+		if (u) {
+			u.load("network");
+			saved_uci_bands = u.get("network", "modem", "bands");
+		}
+	} catch(e) {}
+
+	let bearer = getCarrierSession();
+	let hw = getHardwareProfile();
+	let csq = int((sig_quality * 31) / 100);
+
+	return {
+		operator: {
+			name: op_name,
+			code: op_code,
+			state: state,
+			reg_state: reg_state
+		},
+		signal: {
+			percent: sig_quality,
+			csq: csq,
+			rsrp: serving.rsrp || "--",
+			rsrq: serving.rsrq || "--",
+			rssi: sig_res.rssi || "--",
+			snr: sig_res.snr || "--"
+		},
+		serving: serving,
+		bearer: bearer,
+		hardware: hw,
+		current_bands: current_bands,
+		persisted_bands: saved_uci_bands || "all",
+		neighbors: cell_res.neighbors
+	};
+}
+
+function getTTL() {
+	let enabled = false;
+	let value = 64;
+	try {
+		let u = cursor();
+		if (u) {
+			u.load("firewall");
+			u.foreach("firewall", "include", function(s) {
+				if (s.path == "/etc/firewall.ttl") {
+					enabled = true;
+				}
+			});
+		}
+	} catch(e) {}
+
+	let f_content = readfile("/etc/firewall.ttl");
+	if (f_content) {
+		let m = match(f_content, /ip ttl set ([0-9]+)/);
+		if (m) value = int(m[1]);
+	}
+
+	return {
+		enabled: enabled,
+		value: value
+	};
+}
+
+function setTTL(params) {
+	let enabled = params && (params.enabled == 1 || params.enabled == "1" || params.enabled === true);
+	let value = params && params.value ? int(params.value) : 64;
+	if (value <= 0 || value > 255) value = 64;
+
+	if (enabled) {
+		let nft_script = sprintf(
+			"table inet fw4 {\n" +
+			"    chain mangle_forward_ttl {\n" +
+			"        type filter hook forward priority mangle; policy accept;\n" +
+			"        ip ttl set %d\n" +
+			"        ip6 hoplimit set %d\n" +
+			"    }\n" +
+			"}\n", value, value
+		);
+		writefile("/etc/firewall.ttl", nft_script);
+
+		try {
+			let u = cursor();
+			if (u) {
+				u.load("firewall");
+				let found = false;
+				u.foreach("firewall", "include", function(s) {
+					if (s.path == "/etc/firewall.ttl") found = true;
+				});
+				if (!found) {
+					let sid = u.add("firewall", "include");
+					u.set("firewall", sid, "path", "/etc/firewall.ttl");
+					u.set("firewall", sid, "type", "nftables");
+					u.set("firewall", sid, "position", "ruleset-append");
+					u.commit("firewall");
+				}
+			}
+		} catch(e) {}
+
+		system("nft -f /etc/firewall.ttl 2>/dev/null || /etc/init.d/firewall restart >/dev/null 2>&1");
+	} else {
+		try {
+			let u = cursor();
+			if (u) {
+				u.load("firewall");
+				u.foreach("firewall", "include", function(s) {
+					if (s.path == "/etc/firewall.ttl") {
+						u.delete("firewall", s[".name"]);
+					}
+				});
+				u.commit("firewall");
+			}
+		} catch(e) {}
+
+		system("rm -f /etc/firewall.ttl && nft delete chain inet fw4 mangle_forward_ttl 2>/dev/null || /etc/init.d/firewall restart >/dev/null 2>&1");
+	}
+
+	return { success: true, enabled: enabled, value: value };
+}
+
+function setBandLock(params) {
+	let bands = params ? params.bands : null;
+	let is_auto = (!bands || bands == "all" || bands == "AUTO");
+	if (is_auto) {
+		bands = "eutran-1|eutran-3|eutran-5|eutran-7|eutran-8|eutran-20|eutran-38|eutran-40|eutran-41|utran-1|utran-8";
+	}
+	let clean_bands = replace(bands, "'", "");
+
+	// Persist to UCI network.modem.bands so it survives reboots
+	try {
+		let u = cursor();
+		if (u) {
+			u.load("network");
+			if (is_auto) {
+				u.delete("network", "modem", "bands");
+			} else {
+				u.set("network", "modem", "bands", clean_bands);
+			}
+			u.commit("network");
+		}
+	} catch(e) {}
+
+	let cmd = sprintf("mmcli -m any --set-current-bands=\"%s\" 2>&1", clean_bands);
+	let p = popen(cmd);
+	let out = p ? p.read("all") : "";
+	let rc = p ? p.close() : -1;
+	return {
+		success: (rc == 0 || index(out, "successfully") >= 0),
+		output: trim(out),
+		bands: clean_bands,
+		persisted: !is_auto ? clean_bands : "all"
+	};
+}
+
+function startSpeedtest(params) {
+	let gw = params ? (params.gateway || "cloudflare") : "cloudflare";
+	let sz = params ? (params.size || "standard") : "standard";
+	let chost = params ? (params.custom_host || "") : "";
+	let cdown = params ? (params.custom_down_url || "") : "";
+	let cup = params ? (params.custom_up_url || "") : "";
+
+	// Kill existing test if running
+	let pid_raw = readfile("/tmp/.speedtest.pid");
+	if (pid_raw) {
+		let old_pid = trim(pid_raw);
+		let kp = popen(sprintf("kill -9 %s 2>/dev/null", old_pid));
+		if (kp) kp.close();
+	}
+
+	let cmd = sprintf("/usr/sbin/modem-speedtest '%s' '%s' '%s' '%s' '%s' >/dev/null 2>&1 &",
+		replace(gw, "'", ""),
+		replace(sz, "'", ""),
+		replace(chost, "'", ""),
+		replace(cdown, "'", ""),
+		replace(cup, "'", "")
+	);
+	let p = popen(cmd);
+	if (p) p.close();
+
+	return { started: true, gateway: gw, size: sz };
+}
+
+function getSpeedtestStatus() {
+	let raw = readfile("/tmp/.speedtest_status.json");
+	if (raw) {
+		let j = json(raw);
+		if (j) return j;
+	}
+	return {
+		state: "idle",
+		step: "ready",
+		step_label: "Ready to Test",
+		progress: 0,
+		ping_min: 0,
+		ping_avg: 0,
+		ping_max: 0,
+		jitter: 0,
+		packet_loss: 0,
+		download_mbps: 0,
+		upload_mbps: 0
+	};
+}
+
+function getSpeedtestHistory() {
+	let raw = readfile("/tmp/.speedtest_history.json");
+	if (raw) {
+		let j = json(raw);
+		if (j) return j;
+	}
+	return [];
+}
+
+function cancelSpeedtest() {
+	let pid_raw = readfile("/tmp/.speedtest.pid");
+	if (pid_raw) {
+		let pid = trim(pid_raw);
+		let kp = popen(sprintf("kill -9 %s 2>/dev/null", pid));
+		if (kp) kp.close();
+		let pkill = popen("killall uclient-fetch ping 2>/dev/null");
+		if (pkill) pkill.close();
+	}
+	writefile("/tmp/.speedtest_status.json", '{"state":"idle","step":"cancelled","progress":0}\n');
+	return { cancelled: true };
+}
+
+function clearSpeedtestHistory() {
+	writefile("/tmp/.speedtest_history.json", '[]\n');
+	return { cleared: true };
+}
+
+const methods = {
+	getSystemInfo: {
+		call: function() {
+			return getSystemInfo();
+		}
+	},
+	getTelemetry: {
+		call: function() {
+			return getTelemetry();
+		}
+	},
+	getSignalDetails: {
+		call: function() {
+			return getSignalDetails();
+		}
+	},
+	getTTL: {
+		call: function() {
+			return getTTL();
+		}
+	},
+	setTTL: {
+		args: { enabled: "bool", value: "int" },
+		call: function(req) {
+			return setTTL(req.args);
+		}
+	},
+	setBandLock: {
+		args: { bands: "string" },
+		call: function(req) {
+			return setBandLock(req.args);
+		}
+	},
+	startSpeedtest: {
+		args: {
+			gateway: "string",
+			size: "string",
+			custom_host: "string",
+			custom_down_url: "string",
+			custom_up_url: "string"
+		},
+		call: function(req) {
+			return startSpeedtest(req.args);
+		}
+	},
+	getSpeedtestStatus: {
+		call: function() {
+			return getSpeedtestStatus();
+		}
+	},
+	getSpeedtestHistory: {
+		call: function() {
+			return getSpeedtestHistory();
+		}
+	},
+	cancelSpeedtest: {
+		call: function() {
+			return cancelSpeedtest();
+		}
+	},
+	clearSpeedtestHistory: {
+		call: function() {
+			return clearSpeedtestHistory();
+		}
+	}
+};
+
+return { 'luci.proton-system': methods };

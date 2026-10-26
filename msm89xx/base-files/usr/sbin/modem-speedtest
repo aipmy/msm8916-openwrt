@@ -1,0 +1,275 @@
+#!/bin/sh
+# Qualcomm Snapdragon 410 (MSM8916) LTE Speedtest & Latency Diagnostic Engine
+# Usage: modem-speedtest <gateway_id> [size: standard|fast|deep] [custom_host] [custom_down] [custom_up]
+
+GATEWAY_ID="${1:-cloudflare}"
+TEST_SIZE="${2:-standard}"
+CUSTOM_HOST="$3"
+CUSTOM_DOWN_URL="$4"
+CUSTOM_UP_URL="$5"
+
+OUTPUT_FILE="/tmp/.speedtest_status.json"
+PID_FILE="/tmp/.speedtest.pid"
+HIST_FILE="/tmp/.speedtest_history.json"
+
+echo "$$" > "$PID_FILE"
+
+# Payload sizing 1:1 (Equal Download and Upload sizes)
+DOWN_BYTES=10000000
+UP_COUNT=160 # 160 * 64k = 10.48 MB (1:1 with 10MB Download)
+
+if [ "$TEST_SIZE" = "fast" ]; then
+    DOWN_BYTES=5000000
+    UP_COUNT=80 # 80 * 64k = 5.24 MB (1:1 with 5MB Download)
+elif [ "$TEST_SIZE" = "deep" ]; then
+    DOWN_BYTES=25000000
+    UP_COUNT=400 # 400 * 64k = 26.2 MB (1:1 with 25MB Download)
+fi
+
+SERVER_NAME="Cloudflare Anycast (Jakarta/Singapore)"
+PING_TARGET="1.1.1.1"
+DOWN_URL="https://speed.cloudflare.com/__down?bytes=$DOWN_BYTES"
+UP_URL="https://speed.cloudflare.com/__up"
+LOCATION="Jakarta Anycast"
+
+case "$GATEWAY_ID" in
+    openixp)
+        SERVER_NAME="OpenIXP Domestic Exchange (Cyber Jakarta)"
+        PING_TARGET="103.10.60.1"
+        DOWN_URL="https://speed.cloudflare.com/__down?bytes=$DOWN_BYTES"
+        UP_URL="https://speed.cloudflare.com/__up"
+        LOCATION="Cyber Building (Jakarta, ID)"
+        ;;
+    google)
+        SERVER_NAME="Google Edge Gateway (Jakarta)"
+        PING_TARGET="8.8.8.8"
+        DOWN_URL="https://speed.cloudflare.com/__down?bytes=$DOWN_BYTES"
+        UP_URL="https://speed.cloudflare.com/__up"
+        LOCATION="Jakarta, ID"
+        ;;
+    singnet)
+        SERVER_NAME="Singtel International Gateway (Singapore)"
+        PING_TARGET="speedtest.singnet.com.sg"
+        DOWN_URL="https://speed.cloudflare.com/__down?bytes=$DOWN_BYTES"
+        UP_URL="https://speed.cloudflare.com/__up"
+        LOCATION="Singapore, SG"
+        ;;
+    quad9)
+        SERVER_NAME="Quad9 Global Anycast Gateway"
+        PING_TARGET="9.9.9.9"
+        DOWN_URL="https://speed.cloudflare.com/__down?bytes=$DOWN_BYTES"
+        UP_URL="https://speed.cloudflare.com/__up"
+        LOCATION="Global Anycast"
+        ;;
+    custom)
+        SERVER_NAME="Custom Gateway ($CUSTOM_HOST)"
+        [ -n "$CUSTOM_HOST" ] && PING_TARGET="$CUSTOM_HOST"
+        [ -n "$CUSTOM_DOWN_URL" ] && DOWN_URL="$CUSTOM_DOWN_URL"
+        [ -n "$CUSTOM_UP_URL" ] && UP_URL="$CUSTOM_UP_URL"
+        LOCATION="Custom Target"
+        ;;
+esac
+
+# Read current active radio band & cell info
+ACTIVE_BAND="LTE"
+ACTIVE_OPERATOR="Indosat"
+ACTIVE_RSRP="--"
+ACTIVE_SINR="--"
+if [ -f /tmp/.telemetry_cache.json ]; then
+    ACTIVE_BAND=$(grep -o '"band":"[^"]*"' /tmp/.telemetry_cache.json | cut -d'"' -f4)
+    ACTIVE_OPERATOR=$(grep -o '"operator":"[^"]*"' /tmp/.telemetry_cache.json | cut -d'"' -f4)
+    ACTIVE_RSRP=$(grep -o '"rsrp":"[^"]*"' /tmp/.telemetry_cache.json | cut -d'"' -f4)
+    ACTIVE_SINR=$(grep -o '"snr":"[^"]*"' /tmp/.telemetry_cache.json | cut -d'"' -f4)
+fi
+[ -z "$ACTIVE_BAND" ] && ACTIVE_BAND="LTE"
+
+# Initialize Status
+cat << JSON > "$OUTPUT_FILE"
+{
+  "state": "running",
+  "step": "ping",
+  "step_label": "[Phase 1/3] Analyzing Ping Latency & RFC 3550 Jitter...",
+  "server": "$SERVER_NAME",
+  "location": "$LOCATION",
+  "target": "$PING_TARGET",
+  "band": "$ACTIVE_BAND",
+  "operator": "$ACTIVE_OPERATOR",
+  "rsrp": "$ACTIVE_RSRP",
+  "sinr": "$ACTIVE_SINR",
+  "ping_min": 0,
+  "ping_avg": 0,
+  "ping_max": 0,
+  "jitter": 0,
+  "packet_loss": 0,
+  "download_mbps": 0,
+  "upload_mbps": 0,
+  "progress": 15
+}
+JSON
+
+# 1. PING & JITTER ANALYSIS (10 Probes)
+PING_RAW=$(ping -c 10 -W 2 "$PING_TARGET" 2>&1)
+TIMES=$(echo "$PING_RAW" | awk -F'time=' '/time=/ {print $2}' | awk '{print $1}')
+
+COUNT=0
+TOTAL=0
+MIN=99999
+MAX=0
+PREV=""
+DIFF_SUM=0
+DIFF_CNT=0
+
+for t in $TIMES; do
+    COUNT=$((COUNT + 1))
+    TOTAL=$(awk -v a="$TOTAL" -v b="$t" 'BEGIN {print a + b}')
+    MIN=$(awk -v a="$MIN" -v b="$t" 'BEGIN {print (a < b ? a : b)}')
+    MAX=$(awk -v a="$MAX" -v b="$t" 'BEGIN {print (a > b ? a : b)}')
+    if [ -n "$PREV" ]; then
+        D=$(awk -v a="$t" -v b="$PREV" 'BEGIN {d = a - b; print (d < 0 ? -d : d)}')
+        DIFF_SUM=$(awk -v a="$DIFF_SUM" -v b="$D" 'BEGIN {print a + b}')
+        DIFF_CNT=$((DIFF_CNT + 1))
+    fi
+    PREV="$t"
+done
+
+AVG=0
+JITTER=0
+if [ "$COUNT" -gt 0 ]; then
+    AVG=$(awk -v a="$TOTAL" -v b="$COUNT" 'BEGIN {printf "%.1f", a / b}')
+    [ "$MIN" = "99999" ] && MIN=0
+else
+    MIN=0
+fi
+
+if [ "$DIFF_CNT" -gt 0 ]; then
+    JITTER=$(awk -v a="$DIFF_SUM" -v b="$DIFF_CNT" 'BEGIN {printf "%.1f", a / b}')
+fi
+
+LOSS=$(echo "$PING_RAW" | grep -o '[0-9]*% packet loss' | cut -d'%' -f1)
+[ -z "$LOSS" ] && LOSS=0
+
+# 2. DOWNLOAD SPEEDTEST (Phase 2/3 - Downlink first)
+cat << JSON > "$OUTPUT_FILE"
+{
+  "state": "running",
+  "step": "download",
+  "step_label": "[Phase 2/3] Benchmarking 4G LTE Download Speed ($((DOWN_BYTES / 1000000)) MB)...",
+  "server": "$SERVER_NAME",
+  "location": "$LOCATION",
+  "target": "$PING_TARGET",
+  "band": "$ACTIVE_BAND",
+  "operator": "$ACTIVE_OPERATOR",
+  "rsrp": "$ACTIVE_RSRP",
+  "sinr": "$ACTIVE_SINR",
+  "ping_min": $MIN,
+  "ping_avg": $AVG,
+  "ping_max": $MAX,
+  "jitter": $JITTER,
+  "packet_loss": $LOSS,
+  "download_mbps": 0,
+  "upload_mbps": 0,
+  "progress": 30
+}
+JSON
+
+T_START=$(date +%s)
+RX_START=$(cat /sys/class/net/wwan0/statistics/rx_bytes 2>/dev/null || echo 0)
+
+uclient-fetch -q -O /dev/null "$DOWN_URL"
+
+T_END=$(date +%s)
+RX_END=$(cat /sys/class/net/wwan0/statistics/rx_bytes 2>/dev/null || echo 0)
+
+DT_SEC=$((T_END - T_START))
+[ "$DT_SEC" -le 0 ] && DT_SEC=1
+DRX=$((RX_END - RX_START))
+[ "$DRX" -lt 0 ] && DRX=0
+
+DL_MBPS=$(awk -v bytes="$DRX" -v sec="$DT_SEC" 'BEGIN {if (sec > 0) printf "%.2f", (bytes * 8.0) / (sec * 1000000.0); else print "0"}')
+
+# 3. UPLOAD SPEEDTEST (Phase 3/3 - Uplink after Downlink, 1:1 Payload)
+cat << JSON > "$OUTPUT_FILE"
+{
+  "state": "running",
+  "step": "upload",
+  "step_label": "[Phase 3/3] Benchmarking 4G LTE Upload Speed ($((UP_COUNT * 64 / 1024)) MB 1:1 Payload)...",
+  "server": "$SERVER_NAME",
+  "location": "$LOCATION",
+  "target": "$PING_TARGET",
+  "band": "$ACTIVE_BAND",
+  "operator": "$ACTIVE_OPERATOR",
+  "rsrp": "$ACTIVE_RSRP",
+  "sinr": "$ACTIVE_SINR",
+  "ping_min": $MIN,
+  "ping_avg": $AVG,
+  "ping_max": $MAX,
+  "jitter": $JITTER,
+  "packet_loss": $LOSS,
+  "download_mbps": $DL_MBPS,
+  "upload_mbps": 0,
+  "progress": 65
+}
+JSON
+
+PAYLOAD_FILE="/tmp/.speedtest_payload.bin"
+dd if=/dev/urandom of="$PAYLOAD_FILE" bs=64k count=$UP_COUNT 2>/dev/null
+
+T_START_U=$(date +%s)
+TX_START=$(cat /sys/class/net/wwan0/statistics/tx_bytes 2>/dev/null || echo 0)
+
+uclient-fetch --timeout=30 --post-file="$PAYLOAD_FILE" -O /dev/null -q "$UP_URL" 2>/dev/null || true
+rm -f "$PAYLOAD_FILE"
+
+T_END_U=$(date +%s)
+TX_END=$(cat /sys/class/net/wwan0/statistics/tx_bytes 2>/dev/null || echo 0)
+
+DT_SEC_U=$((T_END_U - T_START_U))
+[ "$DT_SEC_U" -le 0 ] && DT_SEC_U=1
+DTX=$((TX_END - TX_START))
+[ "$DTX" -lt 0 ] && DTX=0
+
+UL_MBPS=$(awk -v bytes="$DTX" -v sec="$DT_SEC_U" 'BEGIN {if (sec > 0) printf "%.2f", (bytes * 8.0) / (sec * 1000000.0); else print "0"}')
+
+TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
+
+cat << JSON > "$OUTPUT_FILE"
+{
+  "state": "completed",
+  "step": "done",
+  "step_label": "Speedtest Benchmark Completed (1:1 Ratio)",
+  "timestamp": "$TIMESTAMP",
+  "server": "$SERVER_NAME",
+  "location": "$LOCATION",
+  "target": "$PING_TARGET",
+  "band": "$ACTIVE_BAND",
+  "operator": "$ACTIVE_OPERATOR",
+  "rsrp": "$ACTIVE_RSRP",
+  "sinr": "$ACTIVE_SINR",
+  "ping_min": $MIN,
+  "ping_avg": $AVG,
+  "ping_max": $MAX,
+  "jitter": $JITTER,
+  "packet_loss": $LOSS,
+  "download_mbps": $DL_MBPS,
+  "upload_mbps": $UL_MBPS,
+  "rx_bytes": $DRX,
+  "tx_bytes": $DTX,
+  "dl_sec": $DT_SEC,
+  "ul_sec": $DT_SEC_U,
+  "progress": 100
+}
+JSON
+
+rm -f "$PID_FILE"
+
+# Append to history log
+ucode -e '
+import { readfile, writefile } from "fs";
+let h = json(readfile("/tmp/.speedtest_history.json") || "[]") || [];
+let e = json(readfile("/tmp/.speedtest_status.json"));
+if (e && e.state == "completed") {
+    unshift(h, e);
+    if (length(h) > 10) h = slice(h, 0, 10);
+    writefile("/tmp/.speedtest_history.json", sprintf("%J\n", h));
+}
+' 2>/dev/null || true

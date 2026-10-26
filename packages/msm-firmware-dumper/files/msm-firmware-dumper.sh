@@ -168,6 +168,11 @@ for pr_dir in "$MNT/modem/image/modem_pr" "$MNT/modem/IMAGE/MODEM_PR" "$MNT/mode
   fi
 done
 
+# Copy factory Wi-Fi MAC address if present
+if [ -f "$MNT/persist/wcnss_mac_addr" ]; then
+  cp -af "$MNT/persist/wcnss_mac_addr" "$FW/wcnss_mac_addr" && log "copied wcnss_mac_addr"
+fi
+
 # MCFG handling:
 for mcfg_try in "$MNT/modem/$MCFG_REL/mcfg_sw.mbn" "$MNT/modem/image/modem_pr/mcfg/configs/mcfg_sw/generic/common/row/gen_3gpp/mcfg_sw.mbn"; do
   if [ -f "$mcfg_try" ]; then

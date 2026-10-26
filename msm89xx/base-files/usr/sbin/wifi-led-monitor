@@ -18,7 +18,8 @@ USAGE
 esac
 
 LED="/sys/class/leds/green:wlan"
-[ -d "$LED" ] || LED="/sys/class/leds/green:wan"
+# Do NOT hijack green:wan on boards where green:wlan is missing (e.g. UZ801)
+[ -d "$LED" ] || exit 0
 WIFI_IF="phy0-ap0"
 
 POLL_INTERVAL=2

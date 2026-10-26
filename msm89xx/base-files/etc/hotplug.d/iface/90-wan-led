@@ -1,0 +1,20 @@
+#!/bin/sh
+# Control green:wan LED based on actual L3 IP network connectivity
+LED="/sys/class/leds/green:wan"
+[ -d "$LED" ] || exit 0
+
+case "$ACTION:$INTERFACE" in
+    ifup:modem)
+        # Modem obtained IP address: turn Green LED ON with traffic blinking
+        echo netdev > "$LED/trigger" 2>/dev/null
+        echo wwan0 > "$LED/device_name" 2>/dev/null
+        echo 1 > "$LED/link" 2>/dev/null
+        echo 1 > "$LED/rx" 2>/dev/null
+        echo 1 > "$LED/tx" 2>/dev/null
+        ;;
+    ifdown:modem)
+        # Modem offline / no IP: turn Green LED completely OFF
+        echo none > "$LED/trigger" 2>/dev/null
+        echo 0 > "$LED/brightness" 2>/dev/null
+        ;;
+esac

@@ -60,6 +60,7 @@ DEFAULT_PACKAGES += coreutils-stty xxd
 # hotplug daemon run /etc/rc.button/failsafe (writing /tmp/failsafe_button) and
 # the post-boot /etc/rc.button/reset handler.  Without it the button is inert.
 DEFAULT_PACKAGES += kmod-gpio-button-hotplug
+DEFAULT_PACKAGES += luci-theme-proton2025
 
 KERNELNAME:=Image
 

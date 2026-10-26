@@ -1,0 +1,46 @@
+{
+	"admin/modem/bandlock": {
+		"title": "Band Lock & Signal",
+		"order": 5,
+		"action": {
+			"type": "view",
+			"path": "modem/bandlock"
+		},
+		"depends": {
+			"acl": [ "luci-modem-tools" ]
+		}
+	},
+	"admin/modem/speedtest": {
+		"title": "Speedtest & Latency",
+		"order": 10,
+		"action": {
+			"type": "view",
+			"path": "modem/speedtest"
+		},
+		"depends": {
+			"acl": [ "luci-modem-tools" ]
+		}
+	},
+	"admin/modem/at": {
+		"title": "AT Commands",
+		"order": 20,
+		"action": {
+			"type": "view",
+			"path": "modem/at"
+		},
+		"depends": {
+			"acl": [ "luci-modem-tools" ]
+		}
+	},
+	"admin/modem/ttl": {
+		"title": "Fix TTL / Hotspot",
+		"order": 30,
+		"action": {
+			"type": "view",
+			"path": "modem/ttl"
+		},
+		"depends": {
+			"acl": [ "luci-modem-tools" ]
+		}
+	}
+}

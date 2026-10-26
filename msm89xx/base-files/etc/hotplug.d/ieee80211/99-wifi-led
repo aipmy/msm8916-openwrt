@@ -22,17 +22,5 @@ case "$(cat /tmp/sysinfo/board_name 2>/dev/null)" in
 	*mf800b*) exit 0 ;;
 esac
 
-LED="/sys/class/leds/green:wlan"
-[ -d "$LED" ] || LED="/sys/class/leds/green:wan"
-[ -d "$LED" ] || exit 0
-
-case "$ACTION" in
-	add)
-		echo none > "$LED/trigger" 2>/dev/null || true
-		echo 1 > "$LED/brightness" 2>/dev/null || true
-		;;
-	remove)
-		echo none > "$LED/trigger" 2>/dev/null || true
-		echo 0 > "$LED/brightness" 2>/dev/null || true
-		;;
-esac
+# Green LED is reserved for WAN (wwan0) via netdev trigger
+exit 0

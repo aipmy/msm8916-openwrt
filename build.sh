@@ -779,7 +779,7 @@ build_target() {
 
     fi
 
-    run_openwrt_make "make -j\$((\$(nproc)+1)) V=sc"
+    run_openwrt_make "make -j\$(($(nproc)+1)) V=sc"
 }
 
 ###############################################################################

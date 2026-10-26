@@ -1,0 +1,12 @@
+#!/bin/sh
+# Qualcomm MSM8916 Persistent Band Lock Hotplug Guard
+
+case "$ACTION:$INTERFACE" in
+	ifup:modem|ifupdate:modem)
+		bands=$(uci -q get network.modem.bands)
+		if [ -n "$bands" ] && [ "$bands" != "all" ]; then
+			logger -t modem-bandlock "Ensuring band lock on $INTERFACE: $bands"
+			mmcli -m any --set-current-bands="$bands" >/dev/null 2>&1 || true
+		fi
+		;;
+esac

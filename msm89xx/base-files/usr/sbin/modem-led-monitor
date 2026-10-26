@@ -181,6 +181,13 @@ modem_healthy()
                 init_modem_hardware || return 1
         fi
 
+        # SIM card status check: RED LED blinks if SIM missing/error, OFF if SIM ready
+        local m_idx="${MODEM_INDEX:-0}"
+        local sim_path="$(mmcli -m "$m_idx" --output-keyvalue 2>/dev/null | awk -F': ' '/modem.generic.sim/ {print $2}' | tr -d ' \r\n')"
+        if [ -z "$sim_path" ] || [ "$sim_path" = "--" ] || [ "$sim_path" = "/" ]; then
+                return 1
+        fi
+
         return 0
 }
 
@@ -199,6 +206,8 @@ BLUE_LED="/sys/class/leds/blue:wan"
 [ -d "$BLUE_LED" ] || BLUE_LED="/sys/class/leds/blue:wlan"
 
 set_blue_led() {
+        return 0; # disabled - blue LED reserved for LAN (br-lan)
+
         local state="$1"
         [ -e "$BLUE_LED/trigger" ] || return 0
         local cur_off="$(cat "$BLUE_LED/delay_off" 2>/dev/null)"

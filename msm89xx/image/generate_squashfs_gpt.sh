@@ -21,8 +21,13 @@ TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 IMG="${TMPDIR}/gpt.img"
 
-# Total size in 512B sectors
-TOT_SECTORS=${TOT_SECTORS:-7569408}
+# Total size in 512B sectors (device-aware fallback)
+if [ -z "$TOT_SECTORS" ] || [ "$TOT_SECTORS" = "7634944" ]; then
+    case "$OUTFILE" in
+        *ufi003*|*mf800b*) TOT_SECTORS=7634944 ;;
+        *) TOT_SECTORS=7569408 ;;
+    esac
+fi
 
 # GPT boundaries
 FIRST_LBA=34

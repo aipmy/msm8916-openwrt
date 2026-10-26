@@ -34,6 +34,34 @@ start() {
 			rm -f /etc/config/wireless
 			/sbin/wifi config 2>/dev/null || true
 		fi
+		if [ -f /etc/config/wireless ]; then
+			current_ssid="$(uci -q get wireless.default_radio0.ssid || true)"
+			if [ "$current_ssid" = "OpenWrt" ] || [ -z "$current_ssid" ]; then
+				mac=""
+				[ -f /lib/firmware/wcnss_mac_addr ] && mac="$(cat /lib/firmware/wcnss_mac_addr 2>/dev/null)"
+				if [ -z "$mac" ]; then
+					for p in /dev/disk/by-partlabel/persist /dev/mmcblk0p6 /dev/mmcblk0p24; do
+						if [ -b "$p" ]; then
+							mkdir -p /tmp/mnt_p
+							mount -o ro "$p" /tmp/mnt_p 2>/dev/null || true
+							[ -f /tmp/mnt_p/wcnss_mac_addr ] && mac="$(cat /tmp/mnt_p/wcnss_mac_addr 2>/dev/null)"
+							umount /tmp/mnt_p 2>/dev/null || true
+							rmdir /tmp/mnt_p 2>/dev/null || true
+							[ -n "$mac" ] && break
+						fi
+					done
+				fi
+				mac_clean="$(echo "$mac" | tr -d ':\r\n ' | tr '[:lower:]' '[:upper:]')"
+				[ -n "$mac_clean" ] && [ "${#mac_clean}" -ge 3 ] && sfx="$(echo -n "$mac_clean" | tail -c 3)" || sfx="4G"
+				uci -q batch << EOF
+set wireless.default_radio0.ssid="Modem 4G - $sfx"
+set wireless.default_radio0.encryption='psk2'
+set wireless.default_radio0.key='1234567890'
+set wireless.default_radio0.disabled='0'
+commit wireless
+EOF
+			fi
+		fi
 		/sbin/wifi reload 2>/dev/null || true
 	else
 		logger -t "$NAME" "Firmware dump FAILED"

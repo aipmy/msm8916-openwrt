@@ -1,0 +1,14 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+
+. /lib/functions/uci-defaults.sh
+
+board_config_update
+
+# Setup Default Hardware LEDs: LAN (Blue) on br-lan, WAN (Green) on wwan0
+ucidef_set_led_netdev "lan" "LAN" "blue:wlan" "br-lan" "link tx rx"
+ucidef_set_led_netdev "wan" "WAN" "green:wan" "wwan0" "link tx rx"
+
+board_config_flush
+
+exit 0

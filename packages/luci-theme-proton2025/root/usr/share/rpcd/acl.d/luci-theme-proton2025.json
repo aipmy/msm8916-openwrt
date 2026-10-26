@@ -1,0 +1,95 @@
+{
+    "luci-theme-proton2025": {
+        "description": "Proton2025 theme - temperature sensor, setting access, and services monitoring",
+        "read": {
+            "ubus": {
+                "luci.proton-temp": [
+                    "getSensors",
+                    "getThresholds",
+                    "resetPeaks"
+                ],
+                "luci.proton-system": [
+                    "getSystemInfo",
+                    "getTelemetry",
+                    "getSignalDetails",
+                    "setBandLock",
+                    "startSpeedtest",
+                    "getSpeedtestStatus",
+                    "getSpeedtestHistory",
+                    "cancelSpeedtest",
+                    "clearSpeedtestHistory"
+                ],
+                "luci.proton-search-cache": [
+                    "loadCache"
+                ],
+                "luci.proton-settings": [
+                    "getSettings",
+                    "getVersion",
+                    "checkUpdate"
+                ],
+                "system": [
+                    "board",
+                    "info"
+                ],
+                "network.interface": [
+                    "dump"
+                ],
+                "network.device": [
+                    "status"
+                ],
+                "luci-rpc": [
+                    "getDHCPLeases"
+                ]
+            },
+            "uci": [
+                "proton2025",
+                "network",
+                "wireless",
+                "dhcp"
+            ],
+            "file": {
+                "/etc/init.d/*": [
+                    "exec"
+                ],
+                "/bin/pidof": [
+                    "exec"
+                ],
+                "/proc/cpuinfo": [
+                    "read"
+                ]
+            }
+        },
+        "write": {
+            "ubus": {
+                "luci.proton-system": [
+                    "setBandLock"
+                ],
+                "luci.proton-temp": [
+                    "setThresholds"
+                ],
+                "luci.proton-settings": [
+                    "setSetting",
+                    "setSettings",
+                    "resetSettings",
+                    "installUpdate"
+                ],
+                "luci.proton-search-cache": [
+                    "saveCache",
+                    "clearCache"
+                ],
+                "luci.proton-packages": [
+                    "installLocal",
+                    "cleanup"
+                ]
+            },
+            "uci": [
+                "proton2025"
+            ],
+            "file": {
+                "/tmp/proton-upload-*": [
+                    "write"
+                ]
+            }
+        }
+    }
+}
