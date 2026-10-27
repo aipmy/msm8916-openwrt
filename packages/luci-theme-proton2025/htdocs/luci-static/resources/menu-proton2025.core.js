@@ -281,6 +281,7 @@ return baseclass.extend({
     };
     window.addEventListener("resize", scheduledResize, { passive: true });
 
+    this.installGlobalToastHook();
     this.whenDomReady(() => this.initFloatingAlerts());
   },
 
@@ -1619,6 +1620,156 @@ return baseclass.extend({
     });
   },
 
+  installGlobalToastHook() {
+    if (this._toastHookInstalled) return;
+    const proto =
+      (typeof ui !== "undefined" && ui && Object.getPrototypeOf(ui)) ||
+      (typeof window !== "undefined" &&
+        window.L?.ui &&
+        Object.getPrototypeOf(window.L.ui)) ||
+      ui;
+    if (!proto || typeof proto.addNotification !== "function") return;
+    this._toastHookInstalled = true;
+    if (proto._protonToastPatched) return;
+    proto._protonToastPatched = true;
+
+    const self = this;
+    const DEFAULT_TOAST_TIMEOUT = 4000;
+    const origAdd = proto.addNotification;
+
+    proto.addNotification = function (title, children, ...classes) {
+      const msg = origAdd.call(this, title, children, ...classes);
+      if (!msg) return msg;
+      try {
+        msg.dataset.protonManaged = "true";
+        msg.classList.remove("fade-in", "proton-alert-native");
+        msg.classList.add("proton-alert-floating");
+
+        const txt = (msg.textContent || "").toLowerCase();
+        if (msg.classList.contains("info") && (txt.includes("success") || txt.includes("berhasil"))) {
+          msg.classList.remove("info");
+          msg.classList.add("success");
+        } else if (!classes.length || (!msg.classList.contains("info") && !msg.classList.contains("success") && !msg.classList.contains("warning") && !msg.classList.contains("error") && !msg.classList.contains("danger"))) {
+          if (txt.includes("error") || txt.includes("failed") || txt.includes("gagal")) {
+            msg.classList.add("error");
+          } else {
+            msg.classList.add("info");
+          }
+        }
+
+        if (!msg.dataset.protonTimeout && !self.hasCustomActionButtons(msg)) {
+          msg.dataset.protonTimeout = String(DEFAULT_TOAST_TIMEOUT);
+          msg.dataset.protonTransient = "true";
+        }
+        if (document.body && msg.parentNode !== document.body) {
+          document.body.appendChild(msg);
+        }
+        if (typeof self._processAlertsNow === "function") {
+          requestAnimationFrame(() => self._processAlertsNow());
+        }
+      } catch (e) {}
+      return msg;
+    };
+
+    proto.addTimeLimitedNotification = function (
+      title,
+      children,
+      timeout,
+      ...classes
+    ) {
+      const msg = this.addNotification(title, children, ...classes);
+      if (msg) {
+        const ms =
+          typeof timeout === "number" && timeout > 0
+            ? timeout
+            : DEFAULT_TOAST_TIMEOUT;
+        msg.dataset.protonTimeout = String(ms);
+        msg.dataset.protonTransient = "true";
+        if (msg._protonTimeoutId) {
+          clearTimeout(msg._protonTimeoutId);
+          msg._protonTimeoutId = null;
+          self.scheduleAlertTimeout(msg, msg.dataset.alertId);
+        }
+      }
+      return msg;
+    };
+  },
+
+  hasCustomActionButtons(alert) {
+    if (!alert) return false;
+    const coreDismissWrap = this._getCoreDismissWrapper(alert);
+    const buttons = Array.from(
+      alert.querySelectorAll(
+        "button:not(.alert-message-close), .cbi-button, .btn, a.cbi-button",
+      ),
+    );
+    return buttons.some((btn) => !coreDismissWrap || !coreDismissWrap.contains(btn));
+  },
+
+  _getCoreDismissWrapper(alert) {
+    const wrapper = alert.lastElementChild;
+    if (!wrapper || wrapper.tagName !== "DIV" || wrapper.className) return null;
+    if (wrapper.childNodes.length !== 1) return null;
+    const btn = wrapper.firstElementChild;
+    if (btn?.tagName === "BUTTON" && btn.classList.contains("btn"))
+      return wrapper;
+    return null;
+  },
+
+  unwrapCoreBodyWrapper(alert) {
+    if (!alert || alert.children.length !== 1) return;
+    const inner = alert.firstElementChild;
+    if (
+      inner &&
+      inner.tagName === "DIV" &&
+      !inner.className &&
+      !inner.id
+    ) {
+      while (inner.firstChild) {
+        alert.insertBefore(inner.firstChild, inner);
+      }
+      inner.remove();
+    }
+  },
+
+  getDefaultAlertTitle(alert) {
+    if (
+      alert.classList.contains("danger") ||
+      alert.classList.contains("error")
+    ) {
+      return _("Error");
+    }
+    if (alert.classList.contains("warning")) {
+      return _("Warning");
+    }
+    if (alert.classList.contains("success")) {
+      return _("Success");
+    }
+    if (alert.classList.contains("spinning")) {
+      return _("Processing");
+    }
+    return _("Notification");
+  },
+
+  _getToastBaseTop() {
+    const isMobile = window.matchMedia("(max-width: 800px)").matches;
+    const strip = document.getElementById("proton-telemetry-strip");
+    if (strip) {
+      const rect = strip.getBoundingClientRect();
+      if (rect.height > 0 && rect.bottom > 0) {
+        return Math.max(
+          Math.round(rect.bottom + (isMobile ? 10 : 12)),
+          isMobile ? 108 : 114,
+        );
+      }
+    }
+    const menubar = document.getElementById("menubar");
+    if (menubar) {
+      return isMobile ? 72 : 84;
+    }
+    return 24;
+  },
+
   initFloatingAlerts() {
     if (this._alertsInitialized) return;
 
@@ -1649,6 +1800,9 @@ return baseclass.extend({
 
           alert.classList.remove("proton-alert-native");
           alert.classList.add("proton-alert-floating");
+          if (document.body && alert.parentNode !== document.body) {
+            document.body.appendChild(alert);
+          }
 
           const contentText = alert.textContent?.trim() || "";
           const alertId = `alert-${this.simpleHash(contentText)}`;
@@ -1665,6 +1819,7 @@ return baseclass.extend({
           }
 
           this.removeCoreDismissButton(alert);
+          this.unwrapCoreBodyWrapper(alert);
           this.ensureAlertStructure(alert);
 
           if (!alert.querySelector(".alert-message-close")) {
@@ -1692,6 +1847,7 @@ return baseclass.extend({
       });
     };
 
+    this._processAlertsNow = processAlerts;
     processAlerts();
 
     if (!this._alertObserver) {
@@ -1715,6 +1871,9 @@ return baseclass.extend({
               } else if (this.isManagedAlert(alert)) {
                 alert.classList.remove("proton-alert-native");
                 alert.classList.add("proton-alert-floating");
+                if (document.body && alert.parentNode !== document.body) {
+                  document.body.appendChild(alert);
+                }
               } else {
                 alert.classList.add("proton-alert-native");
                 alert.classList.remove("proton-alert-floating");
@@ -1752,21 +1911,54 @@ return baseclass.extend({
   },
 
   isManagedAlert(alert) {
-    return alert?.dataset?.protonManaged === "true";
+    if (!alert) return false;
+    if (alert.dataset?.protonManaged === "false") return false;
+    if (alert.dataset?.protonManaged === "true") return true;
+    const parent = alert.parentElement;
+    return parent === document.body || parent?.id === "maincontent";
   },
 
   isTransientAlert(alert) {
-    return parseInt(alert?.dataset?.protonTimeout, 10) > 0;
+    return (
+      alert?.dataset?.protonTransient === "true" ||
+      parseInt(alert?.dataset?.protonTimeout, 10) > 0
+    );
   },
 
   scheduleAlertTimeout(alert, alertId) {
     const timeout = parseInt(alert?.dataset?.protonTimeout, 10);
     if (!(timeout > 0)) return;
 
-    alert._protonTimeoutId = setTimeout(() => {
-      alert._protonTimeoutId = null;
-      this.dismissAlert(alert, alertId, false);
-    }, timeout);
+    let remaining = timeout;
+    let startedAt = Date.now();
+
+    const start = (ms) => {
+      if (alert._protonTimeoutId) clearTimeout(alert._protonTimeoutId);
+      startedAt = Date.now();
+      alert._protonTimeoutId = setTimeout(() => {
+        alert._protonTimeoutId = null;
+        this.dismissAlert(alert, alertId, false);
+      }, ms);
+    };
+
+    start(remaining);
+
+    if (!alert._protonHoverBound) {
+      alert._protonHoverBound = true;
+      alert.addEventListener("mouseenter", () => {
+        if (alert._protonTimeoutId) {
+          clearTimeout(alert._protonTimeoutId);
+          alert._protonTimeoutId = null;
+          remaining = Math.max(800, remaining - (Date.now() - startedAt));
+        }
+      });
+      alert.addEventListener("mouseleave", () => {
+        const curTimeout = parseInt(alert?.dataset?.protonTimeout, 10);
+        if (curTimeout > 0 && !alert._protonTimeoutId && alert.classList.contains("is-visible")) {
+          start(remaining);
+        }
+      });
+    }
   },
 
   isDialogAlert(alert) {
@@ -1776,12 +1968,8 @@ return baseclass.extend({
   },
 
   removeCoreDismissButton(alert) {
-    const wrapper = alert.lastElementChild;
-    if (!wrapper || wrapper.tagName !== "DIV" || wrapper.className) return;
-    if (wrapper.childNodes.length !== 1) return;
-    const btn = wrapper.firstElementChild;
-    if (btn?.tagName === "BUTTON" && btn.classList.contains("btn"))
-      wrapper.remove();
+    const wrapper = this._getCoreDismissWrapper(alert);
+    if (wrapper) wrapper.remove();
   },
 
   ensureAlertStructure(alert) {
@@ -1789,7 +1977,11 @@ return baseclass.extend({
       const content = alert.querySelector(".alert-message-content");
 
       if (!content.querySelector(".alert-message-header")) {
-        const title = content.querySelector(":scope > h4");
+        let title = content.querySelector(":scope > h4");
+        if (!title) {
+          title = document.createElement("h4");
+          title.textContent = this.getDefaultAlertTitle(alert);
+        }
         this._ensureHeader(content, title);
       }
 
@@ -1810,7 +2002,11 @@ return baseclass.extend({
       return;
     }
 
-    const title = alert.querySelector(":scope > h4");
+    let title = alert.querySelector(":scope > h4");
+    if (!title) {
+      title = document.createElement("h4");
+      title.textContent = this.getDefaultAlertTitle(alert);
+    }
     const childNodes = Array.from(alert.childNodes);
 
     const wrapper = document.createElement("div");
@@ -1890,7 +2086,7 @@ return baseclass.extend({
     closeBtn.innerHTML = "×";
     closeBtn.setAttribute("type", "button");
     closeBtn.setAttribute("aria-label", "Close alert");
-    closeBtn.setAttribute("title", "Закрыть уведомление");
+    closeBtn.setAttribute("title", _("Dismiss"));
 
     closeBtn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -1931,7 +2127,7 @@ return baseclass.extend({
 
   repositionAlerts() {
     const gap = 12;
-    const baseTop = window.matchMedia("(max-width: 800px)").matches ? 72 : 84;
+    const baseTop = this._getToastBaseTop();
     let top = baseTop;
 
     const stacked = [
@@ -1956,7 +2152,7 @@ return baseclass.extend({
 
   _positionAlert(alert, batchIndex) {
     const gap = 12;
-    const baseTop = window.matchMedia("(max-width: 800px)").matches ? 72 : 84;
+    const baseTop = this._getToastBaseTop();
     let top = baseTop;
 
     [

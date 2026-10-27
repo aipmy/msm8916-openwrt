@@ -109,7 +109,7 @@ return view.extend({
 							callSetTTL(en, val).then(function(res) {
 								ui.hideIndicator('ttl-apply');
 								if (res && res.success) {
-									ui.addNotification(null, E('p', {}, _('TTL configuration updated successfully (TTL: %d, Status: %s).').format(res.value, res.enabled ? 'Enabled' : 'Disabled')), 'info');
+									ui.addNotification(null, E('p', {}, _('TTL configuration updated successfully (TTL: %d, Status: %s).').format(res.value, res.enabled ? 'Enabled' : 'Disabled')), 'success');
 								} else {
 									ui.addNotification(null, E('p', {}, _('Failed to update TTL rules.')), 'danger');
 								}

@@ -4045,9 +4045,9 @@ html.proton-tabs-proton #packages .cbi-tabmenu li.active a {
 
 .alert-message.proton-alert-floating {
     position: fixed;
-    top: 84px;
+    top: 114px;
     right: 24px;
-    z-index: 2200;
+    z-index: 10050;
     width: min(420px, calc(100vw - 48px));
     margin-bottom: 0;
     opacity: 0;
@@ -4287,7 +4287,7 @@ html.proton-tabs-proton #packages .cbi-tabmenu li.active a {
     }
 
     .alert-message.proton-alert-floating {
-        top: 72px;
+        top: 108px;
         right: 12px;
         width: calc(100vw - 24px);
     }
@@ -8941,9 +8941,9 @@ body.modal-overlay-active #modal_overlay {
 
 .proton-search-index-toast {
     position: fixed;
-    top: 84px;
+    top: 114px;
     right: 24px;
-    z-index: 2201;
+    z-index: 10051;
     display: flex;
     align-items: stretch;
     gap: 0.85rem;

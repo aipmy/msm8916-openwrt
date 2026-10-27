@@ -12,6 +12,10 @@
 			"uci": [ "network", "openvpn", "firewall" ]
 		},
 		"write": {
+			"file": {
+				"/sbin/ifup": [ "exec" ],
+				"/sbin/ifdown": [ "exec" ]
+			},
 			"ubus": {
 				"network.interface": [ "up", "down" ],
 				"network.interface.*": [ "up", "down" ],

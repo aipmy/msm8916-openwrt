@@ -265,9 +265,9 @@ body {
 /* Critical: server-rendered managed alerts must not flash inline before cascade.css */
 .alert-message.proton-alert-floating[data-proton-managed="true"] {
 	position: fixed;
-	top: 84px;
+	top: 114px;
 	right: 24px;
-	z-index: 2200;
+	z-index: 10050;
 	width: min(420px, calc(100vw - 48px));
 	margin-bottom: 0;
 	opacity: 0;
@@ -277,7 +277,7 @@ body {
 
 @media (max-width: 800px) {
 	.alert-message.proton-alert-floating[data-proton-managed="true"] {
-		top: 72px;
+		top: 108px;
 		right: 12px;
 		width: calc(100vw - 24px);
 	}

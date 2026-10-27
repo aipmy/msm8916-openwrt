@@ -20,17 +20,25 @@ var callServiceList = rpc.declare({
 	expect: {}
 });
 
-var callInterfaceUp = rpc.declare({
-	object: 'network.interface',
-	method: 'up',
-	params: [ 'interface' ]
-});
+function callInterfaceUp(ifname) {
+	return rpc.declare({
+		object: 'network.interface.' + ifname,
+		method: 'up',
+		expect: {}
+	})().catch(function() {
+		return fs.exec('/sbin/ifup', [ ifname ]);
+	});
+}
 
-var callInterfaceDown = rpc.declare({
-	object: 'network.interface',
-	method: 'down',
-	params: [ 'interface' ]
-});
+function callInterfaceDown(ifname) {
+	return rpc.declare({
+		object: 'network.interface.' + ifname,
+		method: 'down',
+		expect: {}
+	})().catch(function() {
+		return fs.exec('/sbin/ifdown', [ ifname ]);
+	});
+}
 
 function parseDevStats(content) {
 	var stats = {};
@@ -118,13 +126,13 @@ return view.extend({
 			false,
 			function() {
 				ui.showModal(null, [ E('p', { 'class': 'spinning' }, _('Restarting interface %s…').format(ifname)) ]);
-				callInterfaceDown({ interface: ifname }).then(function() {
+				callInterfaceDown(ifname).then(function() {
 					return new Promise(function(resolve) { setTimeout(resolve, 1500); });
 				}).then(function() {
-					return callInterfaceUp({ interface: ifname });
+					return callInterfaceUp(ifname);
 				}).then(function() {
 					ui.hideModal();
-					ui.addNotification(null, E('p', _('Interface "%s" restarted.').format(ifname)), 'info');
+					ui.addNotification(null, E('p', _('Interface "%s" restarted.').format(ifname)), 'success');
 				}).catch(function(err) {
 					ui.hideModal();
 					ui.addNotification(null, E('p', _('Failed to restart interface: ') + (err.message || err)), 'error');
@@ -148,10 +156,10 @@ return view.extend({
 			currentlyUp,
 			function() {
 				ui.showModal(null, [ E('p', { 'class': 'spinning' }, (currentlyUp ? _('Stopping %s…') : _('Starting %s…')).format(ifname)) ]);
-				var p = currentlyUp ? callInterfaceDown({ interface: ifname }) : callInterfaceUp({ interface: ifname });
+				var p = currentlyUp ? callInterfaceDown(ifname) : callInterfaceUp(ifname);
 				p.then(function() {
 					ui.hideModal();
-					ui.addNotification(null, E('p', (currentlyUp ? _('Interface "%s" stopped.') : _('Interface "%s" started.')).format(ifname)), 'info');
+					ui.addNotification(null, E('p', (currentlyUp ? _('Interface "%s" stopped.') : _('Interface "%s" started.')).format(ifname)), currentlyUp ? 'info' : 'success');
 				}).catch(function(err) {
 					ui.hideModal();
 					ui.addNotification(null, E('p', _('Failed to change interface state: ') + (err.message || err)), 'error');
@@ -169,7 +177,7 @@ return view.extend({
 			true,
 			function() {
 				ui.showModal(null, [ E('p', { 'class': 'spinning' }, _('Deleting interface %s…').format(ifname)) ]);
-				callInterfaceDown({ interface: ifname }).catch(function() { return null; }).then(function() {
+				callInterfaceDown(ifname).catch(function() { return null; }).then(function() {
 					try {
 						uci.delete('network', ifname);
 
@@ -197,7 +205,7 @@ return view.extend({
 							return uci.apply();
 						}).then(function() {
 							ui.hideModal();
-							ui.addNotification(null, E('p', _('Interface "%s" permanently deleted.').format(ifname)), 'info');
+							ui.addNotification(null, E('p', _('Interface "%s" permanently deleted.').format(ifname)), 'success');
 							setTimeout(function() { window.location.reload(); }, 800);
 						});
 					} catch(e) {
@@ -467,7 +475,7 @@ return view.extend({
 								return uci.apply();
 							}).then(function() {
 								ui.hideModal();
-								ui.addNotification(null, E('p', _('VPN interface "%s" successfully created!').format(ifname)), 'info');
+								ui.addNotification(null, E('p', _('VPN interface "%s" successfully created!').format(ifname)), 'success');
 								setTimeout(function() { window.location.reload(); }, 800);
 							}).catch(function(err) {
 								ui.hideModal();
@@ -479,6 +487,299 @@ return view.extend({
 						}
 					}
 				}, _('Connect & Save'))
+			])
+		]);
+	},
+
+	openEditModal: function(ifname, protoId) {
+		var isWireGuard = (protoId === 'wireguard');
+		var self = this;
+
+		var curServer = uci.get('network', ifname, 'server') || '';
+		var curPort = uci.get('network', ifname, 'port') || '443';
+		var curUser = uci.get('network', ifname, 'username') || '';
+		var curPass = uci.get('network', ifname, 'password') || '';
+		var curKeepalive = uci.get('network', ifname, 'keepalive') || '30';
+		if (typeof curKeepalive === 'string' && curKeepalive.indexOf(' ') !== -1) {
+			curKeepalive = curKeepalive.split(' ').pop();
+		}
+		var curDefRoute = (uci.get('network', ifname, 'defaultroute') === '1');
+		var curPeerDns = (uci.get('network', ifname, 'peerdns') === '1');
+
+		var curPrivKey = '';
+		var curPubKey = '';
+		var curClientIp = '';
+		var curAllowedIps = '0.0.0.0/0';
+
+		if (isWireGuard) {
+			curPrivKey = uci.get('network', ifname, 'private_key') || '';
+			var addrs = uci.get('network', ifname, 'addresses') || [];
+			curClientIp = Array.isArray(addrs) ? (addrs[0] || '') : (addrs || '');
+			uci.sections('network', 'wireguard_' + ifname, function(s) {
+				curPubKey = s.public_key || '';
+				var aips = s.allowed_ips || [];
+				curAllowedIps = Array.isArray(aips) ? aips.join(', ') : (aips || '0.0.0.0/0');
+				if (s.endpoint_host) {
+					curServer = s.endpoint_port ? (s.endpoint_host + ':' + s.endpoint_port) : s.endpoint_host;
+				}
+			});
+		}
+
+		var body = E('div', { 'style': 'font-size: 13px;' }, [
+			E('p', { 'style': 'color: var(--text-color-medium, #94a3b8); margin-bottom: 16px; line-height: 1.5;' },
+				_('Edit configuration parameters for VPN interface "%s" (%s).').format(ifname, (protoId || '').toUpperCase())
+			),
+			E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('Interface Name')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%;' }, [
+					E('input', {
+						'type': 'text',
+						'class': 'cbi-input-text',
+						'id': 'edit_vpn_ifname',
+						'value': ifname,
+						'disabled': true,
+						'style': 'width: 100%; opacity: 0.7; cursor: not-allowed;'
+					})
+				])
+			]),
+			E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('Connect To (Server / IP)')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%;' }, [
+					E('input', {
+						'type': 'text',
+						'class': 'cbi-input-text',
+						'id': 'edit_vpn_server',
+						'value': curServer,
+						'placeholder': isWireGuard ? '49.50.10.155:13231' : '49.50.10.155',
+						'style': 'width: 100%;'
+					})
+				])
+			])
+		]);
+
+		if (protoId === 'sstp') {
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('Port')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%;' }, [
+					E('input', {
+						'type': 'number',
+						'class': 'cbi-input-text',
+						'id': 'edit_vpn_port',
+						'value': curPort,
+						'placeholder': '443 or 4430',
+						'style': 'width: 100%;'
+					})
+				])
+			]));
+		}
+
+		if (isWireGuard) {
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('Client IP Address')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%;' }, [
+					E('input', {
+						'type': 'text',
+						'class': 'cbi-input-text',
+						'id': 'edit_vpn_client_ip',
+						'value': curClientIp,
+						'placeholder': '10.50.10.50/24',
+						'style': 'width: 100%;'
+					})
+				])
+			]));
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('Client Private Key')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%;' }, [
+					E('input', {
+						'type': 'password',
+						'class': 'cbi-input-text',
+						'id': 'edit_vpn_privkey',
+						'value': curPrivKey,
+						'placeholder': 'Base64 Private Key',
+						'style': 'width: 100%;'
+					})
+				])
+			]));
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('MikroTik Public Key')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%;' }, [
+					E('input', {
+						'type': 'text',
+						'class': 'cbi-input-text',
+						'id': 'edit_vpn_pubkey',
+						'value': curPubKey,
+						'placeholder': 'f1F7zU8lsZ7sOeOs0nBNBYr6CM7xXRCUOc/D2E8gM2M=',
+						'style': 'width: 100%;'
+					})
+				])
+			]));
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('Allowed IPs')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%;' }, [
+					E('input', {
+						'type': 'text',
+						'class': 'cbi-input-text',
+						'id': 'edit_vpn_allowed_ips',
+						'value': curAllowedIps,
+						'placeholder': '10.50.10.0/24 or 0.0.0.0/0',
+						'style': 'width: 100%;'
+					})
+				])
+			]));
+		} else {
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('User')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%;' }, [
+					E('input', {
+						'type': 'text',
+						'class': 'cbi-input-text',
+						'id': 'edit_vpn_username',
+						'value': curUser,
+						'placeholder': 'PPP Username',
+						'style': 'width: 100%;'
+					})
+				])
+			]));
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('Password')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%;' }, [
+					E('input', {
+						'type': 'password',
+						'class': 'cbi-input-text',
+						'id': 'edit_vpn_password',
+						'value': curPass,
+						'placeholder': 'PPP Password',
+						'style': 'width: 100%;'
+					})
+				])
+			]));
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('Keepalive Timeout (s)')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%;' }, [
+					E('input', {
+						'type': 'number',
+						'class': 'cbi-input-text',
+						'id': 'edit_vpn_keepalive',
+						'value': curKeepalive,
+						'placeholder': '30',
+						'style': 'width: 100%;'
+					})
+				])
+			]));
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: auto;' }, _('Add Default Route')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: auto; margin: 0;' }, [
+					E('input', {
+						'type': 'checkbox',
+						'id': 'edit_vpn_defaultroute',
+						'checked': curDefRoute ? 'checked' : null,
+						'style': 'cursor: pointer;'
+					})
+				])
+			]));
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: auto;' }, _('Use Peer DNS')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: auto; margin: 0;' }, [
+					E('input', {
+						'type': 'checkbox',
+						'id': 'edit_vpn_peerdns',
+						'checked': curPeerDns ? 'checked' : null,
+						'style': 'cursor: pointer;'
+					})
+				])
+			]));
+		}
+
+		ui.showModal(_('Edit VPN Interface: ') + ifname, [
+			body,
+			E('div', { 'class': 'right', 'style': 'margin-top: 20px; display: flex; justify-content: flex-end; gap: 8px;' }, [
+				E('button', {
+					'class': 'cbi-button cbi-button-neutral',
+					'click': ui.hideModal
+				}, _('Cancel')),
+				E('button', {
+					'class': 'cbi-button cbi-button-action',
+					'click': function() {
+						var server = (document.getElementById('edit_vpn_server')?.value || '').trim();
+						if (!server) {
+							ui.addNotification(null, E('p', _('Server address is required.')), 'error');
+							return;
+						}
+
+						ui.showModal(null, [ E('p', { 'class': 'spinning' }, _('Updating VPN Interface…')) ]);
+
+						try {
+							uci.set('network', ifname, 'server', server);
+
+							if (protoId === 'sstp') {
+								var port = (document.getElementById('edit_vpn_port')?.value || '443').trim();
+								uci.set('network', ifname, 'port', port);
+							}
+
+							if (isWireGuard) {
+								var privKey = (document.getElementById('edit_vpn_privkey')?.value || '').trim();
+								var pubKey = (document.getElementById('edit_vpn_pubkey')?.value || '').trim();
+								var clientIp = (document.getElementById('edit_vpn_client_ip')?.value || '').trim();
+								var allowedIps = (document.getElementById('edit_vpn_allowed_ips')?.value || '0.0.0.0/0').trim();
+
+								if (privKey) uci.set('network', ifname, 'private_key', privKey);
+								if (clientIp) uci.set('network', ifname, 'addresses', [ clientIp ]);
+
+								if (pubKey) {
+									var peerSecName = null;
+									uci.sections('network', 'wireguard_' + ifname, function(s) {
+										peerSecName = s['.name'];
+									});
+									if (!peerSecName) {
+										peerSecName = uci.add('network', 'wireguard_' + ifname, 'wgpeer_' + ifname);
+									}
+									uci.set('network', peerSecName, 'public_key', pubKey);
+									uci.set('network', peerSecName, 'route_allowed_ips', '1');
+									uci.set('network', peerSecName, 'allowed_ips', allowedIps.split(/\s*,\s*|\s+/));
+									var parts = server.split(':');
+									if (parts.length === 2) {
+										uci.set('network', peerSecName, 'endpoint_host', parts[0]);
+										uci.set('network', peerSecName, 'endpoint_port', parts[1]);
+									} else {
+										uci.set('network', peerSecName, 'endpoint_host', server);
+									}
+								}
+							} else {
+								var user = (document.getElementById('edit_vpn_username')?.value || '').trim();
+								var pass = (document.getElementById('edit_vpn_password')?.value || '').trim();
+								var keepalive = parseInt(document.getElementById('edit_vpn_keepalive')?.value || '30', 10);
+								var addDefaultRoute = document.getElementById('edit_vpn_defaultroute')?.checked || false;
+								var usePeerDns = document.getElementById('edit_vpn_peerdns')?.checked || false;
+
+								if (user) uci.set('network', ifname, 'username', user);
+								if (pass) uci.set('network', ifname, 'password', pass);
+								uci.set('network', ifname, 'keepalive', '5 ' + keepalive);
+								uci.set('network', ifname, 'defaultroute', addDefaultRoute ? '1' : '0');
+								uci.set('network', ifname, 'peerdns', usePeerDns ? '1' : '0');
+							}
+
+							uci.save().then(function() {
+								return uci.apply();
+							}).then(function() {
+								return callInterfaceDown(ifname).catch(function() { return null; });
+							}).then(function() {
+								return new Promise(function(resolve) { setTimeout(resolve, 1000); });
+							}).then(function() {
+								return callInterfaceUp(ifname).catch(function() { return null; });
+							}).then(function() {
+								ui.hideModal();
+								ui.addNotification(null, E('p', _('VPN interface "%s" updated successfully!').format(ifname)), 'success');
+								setTimeout(function() { window.location.reload(); }, 800);
+							}).catch(function(err) {
+								ui.hideModal();
+								ui.addNotification(null, E('p', _('Failed to update configuration: ') + (err.message || err)), 'error');
+							});
+						} catch(e) {
+							ui.hideModal();
+							ui.addNotification(null, E('p', _('Error: ') + e.message), 'error');
+						}
+					}
+				}, _('Save & Apply'))
 			])
 		]);
 	},
@@ -565,10 +866,10 @@ return view.extend({
 							'click': function() { self.toggleInterface(ifc.interface, isUp); }
 						}, renderSvgIcon(isUp ? 'stop' : 'start')),
 						// Settings Button (⚙️)
-						E('a', {
-							'class': 'vpn-action-btn',
+						E('button', {
+							'class': 'vpn-action-btn btn-settings',
 							'title': _('Settings'),
-							'href': L.url('admin/network/network')
+							'click': function() { self.openEditModal(ifc.interface, ifc.proto); }
 						}, renderSvgIcon('settings')),
 						// Delete Button (🗑️)
 						E('button', {

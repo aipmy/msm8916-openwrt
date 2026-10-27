@@ -142,60 +142,30 @@ return view.extend({
 	},
 
 	showPushToast: function(type, message, details) {
-		var existing = document.getElementById('rf-floating-toast');
-		if (existing && existing.parentNode) {
-			existing.parentNode.removeChild(existing);
+		if (this._activeLoadingToast) {
+			if (this._activeLoadingToast._protonTimeoutId) {
+				clearTimeout(this._activeLoadingToast._protonTimeoutId);
+			}
+			if (this._activeLoadingToast.parentNode) {
+				this._activeLoadingToast.parentNode.removeChild(this._activeLoadingToast);
+			}
+			this._activeLoadingToast = null;
 		}
 
-		var bgColor = '#1e293b';
-		var borderColor = '#38bdf8';
-		var icon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>';
+		var severity = 'info';
+		if (type === 'success') severity = 'success';
+		else if (type === 'error') severity = 'error';
 
-		if (type === 'success') {
-			bgColor = '#064e3b';
-			borderColor = '#10b981';
-			icon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
-		} else if (type === 'error') {
-			bgColor = '#450a0a';
-			borderColor = '#ef4444';
-			icon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
-		} else if (type === 'loading') {
-			bgColor = '#0f172a';
-			borderColor = '#60a5fa';
-			icon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spinning"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>';
-		}
+		var bodyNode = details
+			? E('p', { 'class': type === 'loading' ? 'spinning' : '' }, details)
+			: E('p', { 'class': type === 'loading' ? 'spinning' : '' }, message);
+		var titleText = details ? message : null;
 
-		var toast = E('div', {
-			'id': 'rf-floating-toast',
-			'style': 'position: fixed; top: 76px; left: 50%; transform: translateX(-50%); z-index: 999999; display: flex; align-items: center; gap: 12px; background: ' + bgColor + '; border: 1.5px solid ' + borderColor + '; padding: 12px 20px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); max-width: 90vw; min-width: 300px; color: #fff; font-family: inherit; transition: opacity 0.3s ease, transform 0.3s ease; animation: rfToastIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);'
-		}, [
-			E('div', { 'style': 'display: flex; align-items: center; justify-content: center;' }, [
-				dom.create('span', {}, icon)
-			]),
-			E('div', { 'style': 'flex: 1; font-size: 13px; line-height: 1.4;' }, [
-				E('div', { 'style': 'font-weight: bold; font-size: 13.5px;' }, message),
-				details ? E('div', { 'style': 'font-size: 11.5px; opacity: 0.85; margin-top: 2px;' }, details) : ''
-			]),
-			E('button', {
-				'style': 'background: transparent; border: none; color: rgba(255,255,255,0.6); cursor: pointer; font-size: 16px; padding: 0 4px; line-height: 1;',
-				'click': function() {
-					if (toast.parentNode) toast.parentNode.removeChild(toast);
-				}
-			}, '×')
-		]);
-
-		document.body.appendChild(toast);
-
-		if (type !== 'loading') {
-			setTimeout(function() {
-				if (toast && toast.parentNode) {
-					toast.style.opacity = '0';
-					toast.style.transform = 'translateX(-50%) translateY(-10px)';
-					setTimeout(function() {
-						if (toast.parentNode) toast.parentNode.removeChild(toast);
-					}, 300);
-				}
-			}, 4000);
+		var notif = ui.addNotification(titleText, bodyNode, severity);
+		if (notif && type === 'loading') {
+			notif.dataset.protonTimeout = '0';
+			notif.dataset.protonTransient = 'true';
+			this._activeLoadingToast = notif;
 		}
 	},
 
