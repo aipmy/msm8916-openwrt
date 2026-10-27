@@ -992,8 +992,10 @@ return view.extend({
 			var txSpeed = (isUp && stats.tx >= prev.tx) ? (stats.tx - prev.tx) / timeDelta : 0;
 			self.prevTraffic[devName] = { rx: stats.rx, tx: stats.tx };
 
-			var speedStr = '↓ ' + formatSpeed(rxSpeed) + '  ↑ ' + formatSpeed(txSpeed);
-			var totalStr = 'Total: ↓ ' + formatBytes(stats.rx) + ' / ↑ ' + formatBytes(stats.tx);
+			var speedStr = (rxSpeed > 0 || txSpeed > 0)
+				? ('↓ ' + formatSpeed(rxSpeed) + '  ↑ ' + formatSpeed(txSpeed))
+				: '-';
+			var totalStr = '↓ ' + formatBytes(stats.rx) + '  ↑ ' + formatBytes(stats.tx);
 
 			// Routing & Peer IP details
 			var isDefRoute = (uci.get('network', ifc.interface, 'defaultroute') === '1');
@@ -1015,18 +1017,22 @@ return view.extend({
 
 				var ipCell = row.querySelector('.vpn-ip-cell');
 				if (ipCell) {
-					ipCell.innerHTML = '<span style="color:' + (assignedIp !== '-' ? '#38bdf8' : 'inherit') + ';">' + assignedIp + '</span>' + 
-						(peerIp ? '<div style="font-size:10px;color:var(--text-color-medium,#94a3b8);opacity:0.8;">peer: ' + peerIp + '</div>' : '');
+					ipCell.textContent = assignedIp;
+					ipCell.style.color = (assignedIp !== '-') ? '#38bdf8' : 'inherit';
+					if (peerIp) ipCell.title = _('Peer IP: ') + peerIp;
 				}
+
+				var speedCell = row.querySelector('.vpn-speed-cell');
+				if (speedCell) {
+					speedCell.textContent = speedStr;
+					speedCell.style.color = (speedStr !== '-') ? '#38bdf8' : 'inherit';
+				}
+
+				var totalCell = row.querySelector('.vpn-total-cell');
+				if (totalCell) totalCell.textContent = totalStr;
 
 				var uptimeCell = row.querySelector('.vpn-uptime-cell');
 				if (uptimeCell) uptimeCell.textContent = ifc.uptime ? '%t'.format(ifc.uptime) : '-';
-
-				var trafficCell = row.querySelector('.vpn-traffic-cell');
-				if (trafficCell) {
-					trafficCell.innerHTML = '<div style="font-weight:600;color:' + (isUp ? '#38bdf8' : 'inherit') + ';">' + speedStr + '</div>' +
-						'<div style="font-size:10px;color:var(--text-color-medium,#94a3b8);opacity:0.8;">' + totalStr + '</div>';
-				}
 
 				var toggleBtn = row.querySelector('.btn-toggle');
 				if (toggleBtn) {
@@ -1035,37 +1041,52 @@ return view.extend({
 				}
 			} else {
 				var newRow = E('tr', { 'class': 'tr vpn-data-row', 'id': rowId, 'style': 'border-bottom: 1px solid rgba(255,255,255,0.04);' }, [
+					// 1. Interface
 					E('td', { 'class': 'td vpn-interface-cell', 'style': 'font-weight: 600;' }, [
-						E('div', { 'style': 'display: flex; align-items: center; justify-content: space-between; width: 100%;' }, [
+						E('div', { 'class': 'vpn-ifname-wrap', 'style': 'display: flex; align-items: center; justify-content: space-between; width: 100%;' }, [
 							E('div', { 'style': 'display: flex; align-items: center;' }, [
 								E('span', {
 									'class': 'vpn-status-dot',
 									'title': dotTitle,
 									'style': 'display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: middle; cursor: help; background: ' + dotColor + ';' + (isConnecting ? ' box-shadow: 0 0 6px rgba(245, 158, 11, 0.7);' : (isUp && hasIp ? ' box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);' : ''))
 								}),
-								E('span', { 'class': 'vpn-ifname-text' }, ifc.interface),
-								E('span', {
-									'class': 'badge',
-									'style': 'font-size: 9px; padding: 0 4px; border-radius: 3px; margin-left: 6px; background: ' + routeBadgeBg + '; color: ' + routeBadgeColor + '; border: 1px solid ' + routeBadgeBorder + ';'
-								}, routeBadgeLabel)
+								E('span', { 'class': 'vpn-ifname-text' }, ifc.interface)
 							]),
-							E('span', {
-								'class': 'vpn-proto-badge-mobile',
-								'style': 'font-size: 10px; font-weight: 600; text-transform: uppercase; padding: 1px 6px; border-radius: 4px; background: rgba(255,255,255,0.06); color: var(--proton-fg, #e2e8f0);'
-							}, ifc.proto || '-')
+							// Visible on mobile only
+							E('div', { 'class': 'vpn-badges-mobile', 'style': 'display: flex; gap: 4px;' }, [
+								E('span', {
+									'class': 'vpn-proto-badge-mobile',
+									'style': 'font-size: 10px; font-weight: 600; text-transform: uppercase; padding: 1px 5px; border-radius: 3px; background: rgba(255,255,255,0.06); color: var(--proton-fg, #e2e8f0);'
+								}, ifc.proto || '-'),
+								E('span', {
+									'class': 'vpn-route-badge-mobile',
+									'style': 'font-size: 9.5px; padding: 1px 5px; border-radius: 3px; background: ' + routeBadgeBg + '; color: ' + routeBadgeColor + '; border: 1px solid ' + routeBadgeBorder + ';'
+								}, routeBadgeLabel)
+							])
 						])
 					]),
-					E('td', { 'class': 'td vpn-proto-cell', 'style': 'text-transform: uppercase;' }, ifc.proto || '-'),
-					E('td', { 'class': 'td vpn-col-hide-mobile', 'style': 'font-family: monospace;' }, devName || '-'),
-					E('td', { 'class': 'td vpn-ip-cell', 'style': 'font-family: monospace;' }, [
-						E('span', { 'style': 'color: ' + (assignedIp !== '-' ? '#38bdf8' : 'inherit') + ';' }, assignedIp),
-						peerIp ? E('div', { 'style': 'font-size: 10px; color: var(--text-color-medium, #94a3b8); opacity: 0.8;' }, 'peer: ' + peerIp) : ''
+					// 2. Protocol (Desktop)
+					E('td', { 'class': 'td vpn-proto-cell' }, [
+						E('span', {
+							'style': 'font-size: 10.5px; font-weight: 600; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.05); color: var(--proton-fg, #e2e8f0); border: 1px solid rgba(255,255,255,0.08);'
+						}, ifc.proto || '-')
 					]),
-					E('td', { 'class': 'td vpn-traffic-cell', 'style': 'font-family: monospace; font-size: 11px; white-space: nowrap;' }, [
-						E('div', { 'style': 'font-weight: 600; color: ' + (isUp ? '#38bdf8' : 'inherit') + ';' }, speedStr),
-						E('div', { 'style': 'font-size: 10px; color: var(--text-color-medium, #94a3b8); opacity: 0.8;' }, totalStr)
+					// 3. Routing (Desktop)
+					E('td', { 'class': 'td vpn-route-cell vpn-col-hide-mobile' }, [
+						E('span', {
+							'class': 'badge',
+							'style': 'font-size: 9.5px; padding: 2px 6px; border-radius: 3px; background: ' + routeBadgeBg + '; color: ' + routeBadgeColor + '; border: 1px solid ' + routeBadgeBorder + ';'
+						}, routeBadgeLabel)
 					]),
+					// 4. Assigned IP
+					E('td', { 'class': 'td vpn-ip-cell', 'style': 'font-family: monospace; color: ' + (assignedIp !== '-' ? '#38bdf8' : 'inherit') + ';', 'title': peerIp ? (_('Peer IP: ') + peerIp) : '' }, assignedIp),
+					// 5. Speed (Rate)
+					E('td', { 'class': 'td vpn-speed-cell', 'style': 'font-family: monospace; font-size: 11px; color: ' + (speedStr !== '-' ? '#38bdf8' : 'inherit') + ';' }, speedStr),
+					// 6. Total Traffic
+					E('td', { 'class': 'td vpn-total-cell', 'style': 'font-family: monospace; font-size: 11px; white-space: nowrap;' }, totalStr),
+					// 7. Uptime
 					E('td', { 'class': 'td vpn-uptime-cell vpn-col-hide-mobile' }, ifc.uptime ? '%t'.format(ifc.uptime) : '-'),
+					// 8. Actions
 					E('td', { 'class': 'td vpn-actions-cell', 'style': 'text-align: right; white-space: nowrap;' }, [
 						// Restart Button (🔄)
 						E('button', {
@@ -1211,13 +1232,13 @@ return view.extend({
 			'  justify-content: space-between; transition: border-color 0.15s ease, background 0.15s ease;',
 			'}',
 			'.vpn-proto-card:hover { border-color: rgba(255,255,255,0.18); background: rgba(255,255,255,0.04); }',
-			'.vpn-proto-badge-mobile { display: none; }',
+			'.vpn-badges-mobile { display: none; }',
 			'@media (max-width: 768px) {',
 			'  .vpn-hero-card { padding: 10px 12px !important; margin-bottom: 8px !important; }',
 			'  .vpn-hero-card h2 { font-size: 15px !important; }',
 			'  .vpn-hero-card p { display: none !important; }',
 			'  .vpn-legend-wrap { width: 100% !important; margin-top: 6px !important; flex-wrap: wrap !important; gap: 8px !important; }',
-			'  .vpn-section-card { padding: 10px 10px !important; margin-bottom: 8px !important; }',
+			'  .vpn-section-card { padding: 8px 10px !important; margin-bottom: 8px !important; }',
 			'  .vpn-proto-grid { grid-template-columns: 1fr !important; gap: 8px !important; margin-bottom: 8px !important; }',
 			'  .vpn-proto-card { padding: 10px 12px !important; }',
 			'  .vpn-table thead { display: none !important; }',
@@ -1226,21 +1247,23 @@ return view.extend({
 			'    display: flex !important; flex-direction: column !important;',
 			'    background: rgba(255, 255, 255, 0.02) !important;',
 			'    border: 1px solid var(--proton-border, rgba(255, 255, 255, 0.08)) !important;',
-			'    border-radius: 8px !important; padding: 10px 12px !important; margin-bottom: 8px !important; gap: 6px !important;',
+			'    border-radius: 8px !important; padding: 10px 12px !important; margin-bottom: 8px !important; gap: 5px !important;',
 			'  }',
 			'  .vpn-table tr.vpn-data-row td {',
 			'    display: flex !important; justify-content: space-between !important; align-items: center !important;',
 			'    padding: 0 !important; border: none !important; width: 100% !important;',
 			'  }',
-			'  .vpn-proto-badge-mobile { display: inline-block !important; }',
+			'  .vpn-badges-mobile { display: flex !important; }',
 			'  .vpn-proto-cell { display: none !important; }',
+			'  .vpn-route-cell { display: none !important; }',
 			'  .vpn-col-hide-mobile { display: none !important; }',
-			'  .vpn-interface-cell { padding-bottom: 6px !important; border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important; font-size: 13.5px !important; }',
+			'  .vpn-interface-cell { padding-bottom: 5px !important; border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important; font-size: 13.5px !important; }',
 			'  .vpn-ip-cell { font-size: 11.5px !important; }',
 			'  .vpn-ip-cell::before { content: "IP Address:"; color: var(--text-color-medium, #94a3b8); font-size: 11px; }',
-			'  .vpn-traffic-cell { font-size: 11px !important; }',
-			'  .vpn-traffic-cell::before { content: "Throughput:"; color: var(--text-color-medium, #94a3b8); font-size: 11px; }',
-			'  .vpn-traffic-cell > div { text-align: right; }',
+			'  .vpn-speed-cell { font-size: 11px !important; }',
+			'  .vpn-speed-cell::before { content: "Speed (Rate):"; color: var(--text-color-medium, #94a3b8); font-size: 11px; }',
+			'  .vpn-total-cell { font-size: 11px !important; }',
+			'  .vpn-total-cell::before { content: "Total Traffic:"; color: var(--text-color-medium, #94a3b8); font-size: 11px; }',
 			'  .vpn-uptime-cell { display: flex !important; font-size: 11px !important; }',
 			'  .vpn-uptime-cell::before { content: "Uptime:"; color: var(--text-color-medium, #94a3b8); font-size: 11px; }',
 			'  .vpn-actions-cell {',
@@ -1315,16 +1338,17 @@ return view.extend({
 				E('tr', { 'class': 'tr table-titles', 'style': 'border-bottom: 1px solid var(--proton-border, rgba(255,255,255,0.1));' }, [
 					E('th', { 'class': 'th' }, _('Interface')),
 					E('th', { 'class': 'th' }, _('Protocol')),
-					E('th', { 'class': 'th vpn-col-hide-mobile' }, _('Device')),
+					E('th', { 'class': 'th vpn-col-hide-mobile' }, _('Routing')),
 					E('th', { 'class': 'th' }, _('Assigned IP')),
-					E('th', { 'class': 'th' }, _('Traffic (RX / TX)')),
+					E('th', { 'class': 'th' }, _('Speed (Rate)')),
+					E('th', { 'class': 'th' }, _('Total Traffic')),
 					E('th', { 'class': 'th vpn-col-hide-mobile' }, _('Uptime')),
 					E('th', { 'class': 'th', 'style': 'text-align: right;' }, _('Actions'))
 				])
 			]),
 			E('tbody', { 'id': 'vpn_tunnels_tbody' }, [
 				E('tr', { 'id': 'vpn_empty_row', 'style': 'display: none;' }, [
-					E('td', { 'colspan': '7', 'style': 'text-align: center; padding: 14px; color: var(--text-color-medium, #94a3b8); font-size: 11.5px;' }, _('No active VPN connections.'))
+					E('td', { 'colspan': '8', 'style': 'text-align: center; padding: 14px; color: var(--text-color-medium, #94a3b8); font-size: 11.5px;' }, _('No active VPN connections.'))
 				])
 			])
 		]);
