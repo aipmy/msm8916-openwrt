@@ -102,6 +102,12 @@ function formatSpeed(bytesPerSec) {
 	return (bytesPerSec / 1048576).toFixed(2) + ' MB/s';
 }
 
+function renderTrafficHTML(rxStr, txStr) {
+	return '<span style="color: #10b981; font-weight: 700; margin-right: 3px;">↓</span>' + rxStr +
+	       '<span style="display: inline-block; width: 10px;"></span>' +
+	       '<span style="color: #38bdf8; font-weight: 700; margin-right: 3px;">↑</span>' + txStr;
+}
+
 function renderSvgIcon(type) {
 	var svg = '';
 	if (type === 'log') {
@@ -245,6 +251,11 @@ return view.extend({
 
 	toggleInterface: function(ifname, currentlyUp) {
 		var self = this;
+		if (currentlyUp === undefined || currentlyUp === null) {
+			var row = document.getElementById('vpn_row_' + ifname);
+			var btn = row ? row.querySelector('.btn-toggle') : null;
+			currentlyUp = btn ? (btn.getAttribute('data-up') === '1') : false;
+		}
 		var actionTitle = currentlyUp ? _('Stop Interface') : _('Start Interface');
 		var actionMsg = currentlyUp 
 			? _('Stop/disconnect VPN interface "%s"?').format(ifname)
@@ -992,8 +1003,8 @@ return view.extend({
 			var txSpeed = (isUp && stats.tx >= prev.tx) ? (stats.tx - prev.tx) / timeDelta : 0;
 			self.prevTraffic[devName] = { rx: stats.rx, tx: stats.tx };
 
-			var speedStr = '↓ ' + formatSpeed(rxSpeed) + '  ↑ ' + formatSpeed(txSpeed);
-			var totalStr = '↓ ' + formatBytes(stats.rx) + '  ↑ ' + formatBytes(stats.tx);
+			var speedHTML = renderTrafficHTML(formatSpeed(rxSpeed), formatSpeed(txSpeed));
+			var totalHTML = renderTrafficHTML(formatBytes(stats.rx), formatBytes(stats.tx));
 
 			// Routing & Peer IP details
 			var isDefRoute = (uci.get('network', ifc.interface, 'defaultroute') === '1');
@@ -1021,19 +1032,17 @@ return view.extend({
 				}
 
 				var speedCell = row.querySelector('.vpn-speed-cell');
-				if (speedCell) {
-					speedCell.textContent = speedStr;
-					speedCell.style.color = (rxSpeed > 0 || txSpeed > 0) ? '#38bdf8' : 'inherit';
-				}
+				if (speedCell) speedCell.innerHTML = speedHTML;
 
 				var totalCell = row.querySelector('.vpn-total-cell');
-				if (totalCell) totalCell.textContent = totalStr;
+				if (totalCell) totalCell.innerHTML = totalHTML;
 
 				var uptimeCell = row.querySelector('.vpn-uptime-cell');
 				if (uptimeCell) uptimeCell.textContent = ifc.uptime ? '%t'.format(ifc.uptime) : '-';
 
 				var toggleBtn = row.querySelector('.btn-toggle');
 				if (toggleBtn) {
+					toggleBtn.setAttribute('data-up', isUp ? '1' : '0');
 					toggleBtn.title = isUp ? _('Stop interface') : _('Start interface');
 					dom.content(toggleBtn, renderSvgIcon(isUp ? 'stop' : 'start'));
 				}
@@ -1064,9 +1073,17 @@ return view.extend({
 					// 4. Assigned IP
 					E('td', { 'class': 'td vpn-ip-cell', 'style': 'font-family: monospace; color: ' + (assignedIp !== '-' ? '#38bdf8' : 'inherit') + ';', 'title': peerIp ? (_('Peer IP: ') + peerIp) : '' }, assignedIp),
 					// 5. Speed (Rate)
-					E('td', { 'class': 'td vpn-speed-cell', 'style': 'font-family: monospace; font-size: 11px; color: ' + ((rxSpeed > 0 || txSpeed > 0) ? '#38bdf8' : 'inherit') + ';' }, speedStr),
+					(function() {
+						var td = E('td', { 'class': 'td vpn-speed-cell', 'style': 'font-family: monospace; font-size: 11px; white-space: nowrap;' });
+						td.innerHTML = speedHTML;
+						return td;
+					})(),
 					// 6. Total Traffic
-					E('td', { 'class': 'td vpn-total-cell', 'style': 'font-family: monospace; font-size: 11px; white-space: nowrap;' }, totalStr),
+					(function() {
+						var td = E('td', { 'class': 'td vpn-total-cell', 'style': 'font-family: monospace; font-size: 11px; white-space: nowrap;' });
+						td.innerHTML = totalHTML;
+						return td;
+					})(),
 					// 7. Uptime
 					E('td', { 'class': 'td vpn-uptime-cell vpn-col-hide-mobile' }, ifc.uptime ? '%t'.format(ifc.uptime) : '-'),
 					// 8. Actions
@@ -1080,8 +1097,13 @@ return view.extend({
 						// Toggle Stop / Start Button (⏸️ / ▶️)
 						E('button', {
 							'class': 'vpn-action-btn btn-toggle',
+							'data-up': isUp ? '1' : '0',
 							'title': isUp ? _('Stop interface') : _('Start interface'),
-							'click': function() { self.toggleInterface(ifc.interface, isUp); }
+							'click': function(ev) {
+								var btn = ev.currentTarget;
+								var isCurrentUp = (btn.getAttribute('data-up') === '1');
+								self.toggleInterface(ifc.interface, isCurrentUp);
+							}
 						}, renderSvgIcon(isUp ? 'stop' : 'start')),
 						// Logs Button (📄)
 						E('button', {
@@ -1236,7 +1258,12 @@ return view.extend({
 			'    padding: 0 !important; border: none !important; width: 100% !important;',
 			'  }',
 			'  .vpn-col-hide-mobile { display: none !important; }',
-			'  .vpn-interface-cell { padding-bottom: 5px !important; border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important; font-size: 13.5px !important; }',
+			'  .vpn-interface-cell {',
+			'    display: flex !important; justify-content: flex-start !important; align-items: center !important;',
+			'    gap: 8px !important; padding-bottom: 5px !important; border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;',
+			'    font-size: 13.5px !important;',
+			'  }',
+			'  .vpn-status-dot { flex-shrink: 0 !important; margin-right: 0 !important; }',
 			'  .vpn-proto-cell { font-size: 11.5px !important; }',
 			'  .vpn-proto-cell::before { content: "Protocol:"; color: var(--text-color-medium, #94a3b8); font-size: 11px; }',
 			'  .vpn-route-cell { font-size: 11px !important; }',
