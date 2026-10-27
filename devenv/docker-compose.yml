@@ -20,6 +20,6 @@ services:
     network_mode: host
 
     volumes:
-      - ..:/repo
+      - /Volumes/OpenWrtBuild/msm8916-openwrt:/repo
 
     command: ["/bin/bash"]

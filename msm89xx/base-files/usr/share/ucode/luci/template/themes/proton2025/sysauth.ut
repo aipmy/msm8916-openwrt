@@ -318,8 +318,8 @@ body.login-page { background-color: {{ serverTheme === 'light' ? '#ffffff' : '#0
 			</button>
 		</form>
 
-		<div class="login-powered">
-			<span>Powered by OpenWrt</span>
+		<div class="login-powered" style="display: block !important; margin-top: 18px; text-align: center; font-size: 13px; color: var(--proton-muted, #94a3b8); letter-spacing: 0.5px;">
+			<span>ModemRadar by aipmy</span>
 		</div>
 	</div>
 </div>

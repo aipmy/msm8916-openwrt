@@ -9,11 +9,8 @@
 	</div>
 </div>
 
-<footer class="proton-footer">
-	{{ _('Powered by') }} <a href="https://github.com/openwrt/luci">LuCI</a> ({{ version.luciversion }})
-	/ {{ version.distname }} ({{ version.distversion }}) {{ version.distrevision }}
-	/ Proton2025 Theme v1.4.4
-	/ <a href="https://github.com/ChesterGoodiny/luci-theme-proton2025" target="_blank" rel="noopener noreferrer">GitHub</a>
+<footer class="proton-footer" style="display: block !important; text-align: center; padding: 18px 0; font-size: 13px; color: var(--proton-muted, #94a3b8);">
+	<span>ModemRadar by aipmy</span>
 </footer>
 
 <script>
