@@ -1035,23 +1035,27 @@ return view.extend({
 				}
 			} else {
 				var newRow = E('tr', { 'class': 'tr vpn-data-row', 'id': rowId, 'style': 'border-bottom: 1px solid rgba(255,255,255,0.04);' }, [
-					E('td', { 'class': 'td', 'style': 'font-weight: 600;' }, [
-						E('div', { 'style': 'display: flex; align-items: center;' }, [
+					E('td', { 'class': 'td vpn-interface-cell', 'style': 'font-weight: 600;' }, [
+						E('div', { 'style': 'display: flex; align-items: center; justify-content: space-between; width: 100%;' }, [
+							E('div', { 'style': 'display: flex; align-items: center;' }, [
+								E('span', {
+									'class': 'vpn-status-dot',
+									'title': dotTitle,
+									'style': 'display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: middle; cursor: help; background: ' + dotColor + ';' + (isConnecting ? ' box-shadow: 0 0 6px rgba(245, 158, 11, 0.7);' : (isUp && hasIp ? ' box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);' : ''))
+								}),
+								E('span', { 'class': 'vpn-ifname-text' }, ifc.interface),
+								E('span', {
+									'class': 'badge',
+									'style': 'font-size: 9px; padding: 0 4px; border-radius: 3px; margin-left: 6px; background: ' + routeBadgeBg + '; color: ' + routeBadgeColor + '; border: 1px solid ' + routeBadgeBorder + ';'
+								}, routeBadgeLabel)
+							]),
 							E('span', {
-								'class': 'vpn-status-dot',
-								'title': dotTitle,
-								'style': 'display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: middle; cursor: help; background: ' + dotColor + ';' + (isConnecting ? ' box-shadow: 0 0 6px rgba(245, 158, 11, 0.7);' : (isUp && hasIp ? ' box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);' : ''))
-							}),
-							E('span', {}, ifc.interface)
-						]),
-						E('div', { 'style': 'margin-top: 2px;' }, [
-							E('span', {
-								'class': 'badge',
-								'style': 'font-size: 9px; padding: 0 4px; border-radius: 3px; background: ' + routeBadgeBg + '; color: ' + routeBadgeColor + '; border: 1px solid ' + routeBadgeBorder + ';'
-							}, routeBadgeLabel)
+								'class': 'vpn-proto-badge-mobile',
+								'style': 'font-size: 10px; font-weight: 600; text-transform: uppercase; padding: 1px 6px; border-radius: 4px; background: rgba(255,255,255,0.06); color: var(--proton-fg, #e2e8f0);'
+							}, ifc.proto || '-')
 						])
 					]),
-					E('td', { 'class': 'td', 'style': 'text-transform: uppercase;' }, ifc.proto || '-'),
+					E('td', { 'class': 'td vpn-proto-cell', 'style': 'text-transform: uppercase;' }, ifc.proto || '-'),
 					E('td', { 'class': 'td vpn-col-hide-mobile', 'style': 'font-family: monospace;' }, devName || '-'),
 					E('td', { 'class': 'td vpn-ip-cell', 'style': 'font-family: monospace;' }, [
 						E('span', { 'style': 'color: ' + (assignedIp !== '-' ? '#38bdf8' : 'inherit') + ';' }, assignedIp),
@@ -1062,7 +1066,7 @@ return view.extend({
 						E('div', { 'style': 'font-size: 10px; color: var(--text-color-medium, #94a3b8); opacity: 0.8;' }, totalStr)
 					]),
 					E('td', { 'class': 'td vpn-uptime-cell vpn-col-hide-mobile' }, ifc.uptime ? '%t'.format(ifc.uptime) : '-'),
-					E('td', { 'class': 'td', 'style': 'text-align: right; white-space: nowrap;' }, [
+					E('td', { 'class': 'td vpn-actions-cell', 'style': 'text-align: right; white-space: nowrap;' }, [
 						// Restart Button (🔄)
 						E('button', {
 							'class': 'vpn-action-btn btn-restart',
@@ -1187,35 +1191,67 @@ return view.extend({
 			'.vpn-action-btn.btn-toggle:hover { background: rgba(245, 158, 11, 0.25); border-color: #f59e0b; color: #f59e0b; }',
 			'.vpn-action-btn.btn-delete:hover { background: rgba(239, 68, 68, 0.25); border-color: #ef4444; color: #ef4444; }',
 			'.vpn-hero-card {',
-			'  background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%);',
-			'  border: 1px solid var(--proton-border, rgba(255,255,255,0.08)); border-radius: 10px;',
-			'  padding: 14px 18px; margin-bottom: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.18);',
+			'  background: linear-gradient(135deg, rgba(24, 32, 47, 0.7) 0%, rgba(12, 17, 29, 0.9) 100%);',
+			'  border: 1px solid var(--proton-border, rgba(255,255,255,0.08)); border-radius: 8px;',
+			'  padding: 12px 16px; margin-bottom: 12px;',
 			'}',
 			'.vpn-section-card {',
-			'  background: var(--proton-card-bg, rgba(255,255,255,0.03));',
-			'  border: 1px solid var(--proton-border, rgba(255,255,255,0.08));',
-			'  border-radius: 9px; padding: 12px 16px; margin-bottom: 12px;',
+			'  background: var(--proton-card-bg, rgba(255,255,255,0.025));',
+			'  border: 1px solid var(--proton-border, rgba(255,255,255,0.07));',
+			'  border-radius: 8px; padding: 12px 16px; margin-bottom: 12px;',
 			'}',
 			'.vpn-proto-grid {',
-			'  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));',
+			'  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));',
 			'  gap: 10px; margin-bottom: 12px;',
 			'}',
 			'.vpn-proto-card {',
-			'  background: var(--proton-card-bg, rgba(255,255,255,0.03));',
-			'  border: 1px solid var(--proton-border, rgba(255,255,255,0.08));',
-			'  border-radius: 9px; padding: 12px 14px; display: flex; flex-direction: column;',
-			'  justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.12);',
+			'  background: var(--proton-card-bg, rgba(255,255,255,0.02));',
+			'  border: 1px solid var(--proton-border, rgba(255,255,255,0.07));',
+			'  border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column;',
+			'  justify-content: space-between; transition: border-color 0.15s ease, background 0.15s ease;',
 			'}',
+			'.vpn-proto-card:hover { border-color: rgba(255,255,255,0.18); background: rgba(255,255,255,0.04); }',
+			'.vpn-proto-badge-mobile { display: none; }',
 			'@media (max-width: 768px) {',
 			'  .vpn-hero-card { padding: 10px 12px !important; margin-bottom: 8px !important; }',
-			'  .vpn-hero-card h2 { font-size: 16px !important; }',
-			'  .vpn-hero-card p { font-size: 11px !important; line-height: 1.35 !important; }',
-			'  .vpn-section-card { padding: 8px 10px !important; margin-bottom: 8px !important; }',
+			'  .vpn-hero-card h2 { font-size: 15px !important; }',
+			'  .vpn-hero-card p { display: none !important; }',
+			'  .vpn-legend-wrap { width: 100% !important; margin-top: 6px !important; flex-wrap: wrap !important; gap: 8px !important; }',
+			'  .vpn-section-card { padding: 10px 10px !important; margin-bottom: 8px !important; }',
 			'  .vpn-proto-grid { grid-template-columns: 1fr !important; gap: 8px !important; margin-bottom: 8px !important; }',
-			'  .vpn-proto-card { padding: 10px 10px !important; }',
+			'  .vpn-proto-card { padding: 10px 12px !important; }',
+			'  .vpn-table thead { display: none !important; }',
+			'  .vpn-table, .vpn-table tbody { display: block !important; width: 100% !important; }',
+			'  .vpn-table tr.vpn-data-row {',
+			'    display: flex !important; flex-direction: column !important;',
+			'    background: rgba(255, 255, 255, 0.02) !important;',
+			'    border: 1px solid var(--proton-border, rgba(255, 255, 255, 0.08)) !important;',
+			'    border-radius: 8px !important; padding: 10px 12px !important; margin-bottom: 8px !important; gap: 6px !important;',
+			'  }',
+			'  .vpn-table tr.vpn-data-row td {',
+			'    display: flex !important; justify-content: space-between !important; align-items: center !important;',
+			'    padding: 0 !important; border: none !important; width: 100% !important;',
+			'  }',
+			'  .vpn-proto-badge-mobile { display: inline-block !important; }',
+			'  .vpn-proto-cell { display: none !important; }',
 			'  .vpn-col-hide-mobile { display: none !important; }',
-			'  .vpn-table th, .vpn-table td { padding: 5px 3px !important; font-size: 10.5px !important; }',
-			'  .vpn-action-btn { width: 25px !important; height: 25px !important; margin-left: 2px !important; }',
+			'  .vpn-interface-cell { padding-bottom: 6px !important; border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important; font-size: 13.5px !important; }',
+			'  .vpn-ip-cell { font-size: 11.5px !important; }',
+			'  .vpn-ip-cell::before { content: "IP Address:"; color: var(--text-color-medium, #94a3b8); font-size: 11px; }',
+			'  .vpn-traffic-cell { font-size: 11px !important; }',
+			'  .vpn-traffic-cell::before { content: "Throughput:"; color: var(--text-color-medium, #94a3b8); font-size: 11px; }',
+			'  .vpn-traffic-cell > div { text-align: right; }',
+			'  .vpn-uptime-cell { display: flex !important; font-size: 11px !important; }',
+			'  .vpn-uptime-cell::before { content: "Uptime:"; color: var(--text-color-medium, #94a3b8); font-size: 11px; }',
+			'  .vpn-actions-cell {',
+			'    padding-top: 8px !important; margin-top: 4px !important;',
+			'    border-top: 1px solid rgba(255, 255, 255, 0.05) !important;',
+			'    justify-content: flex-end !important; gap: 6px !important;',
+			'  }',
+			'  .vpn-action-btn { width: 30px !important; height: 30px !important; margin-left: 0 !important; border-radius: 6px !important; }',
+			'  .cbi-value { flex-direction: column !important; align-items: flex-start !important; }',
+			'  .cbi-value-title { width: 100% !important; margin-bottom: 4px !important; text-align: left !important; }',
+			'  .cbi-value-field { width: 100% !important; }',
 			'}'
 		]));
 
@@ -1254,7 +1290,7 @@ return view.extend({
 				E('h3', { 'style': 'margin: 0 0 2px 0; font-size: 14px; font-weight: 600;' }, _('Active VPN Tunnels')),
 				E('p', { 'style': 'margin: 0; font-size: 11px; color: var(--text-color-medium, #94a3b8);' }, _('Connected VPN uplinks routing network traffic.'))
 			]),
-			E('div', { 'style': 'display: flex; align-items: center; gap: 10px; font-size: 10.5px; color: var(--text-color-medium, #94a3b8);' }, [
+			E('div', { 'class': 'vpn-legend-wrap', 'style': 'display: flex; align-items: center; gap: 10px; font-size: 10.5px; color: var(--text-color-medium, #94a3b8);' }, [
 				E('span', { 'style': 'display: flex; align-items: center; gap: 4px;' }, [
 					E('span', { 'style': 'width: 6px; height: 6px; border-radius: 50%; background: #10b981; box-shadow: 0 0 4px #10b981;' }),
 					_('Connected')
