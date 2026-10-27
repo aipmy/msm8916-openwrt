@@ -40,6 +40,35 @@ function callInterfaceDown(ifname) {
 	});
 }
 
+var callUciCommit = rpc.declare({
+	object: 'uci',
+	method: 'commit',
+	params: [ 'config' ],
+	expect: {}
+});
+
+var callUciReloadConfig = rpc.declare({
+	object: 'uci',
+	method: 'reload_config',
+	expect: {}
+});
+
+function commitAndApplyUCI(configs) {
+	var pkgList = configs || [ 'network', 'firewall' ];
+	return uci.save().then(function() {
+		var tasks = pkgList.map(function(pkg) {
+			return callUciCommit({ config: pkg }).catch(function() { return null; });
+		});
+		return Promise.all(tasks);
+	}).then(function() {
+		return callUciReloadConfig().catch(function() { return null; });
+	}).then(function() {
+		if (typeof L !== 'undefined' && L.ui && L.ui.changes) {
+			return L.resolveDefault(L.ui.changes.init(), null);
+		}
+	});
+}
+
 function parseDevStats(content) {
 	var stats = {};
 	if (!content) return stats;
@@ -160,7 +189,7 @@ return view.extend({
 				var preparePromise = Promise.resolve();
 				if (!currentlyUp && uci.get('network', ifname, 'disabled') === '1') {
 					uci.unset('network', ifname, 'disabled');
-					preparePromise = uci.save().then(function() { return uci.apply(); });
+					preparePromise = commitAndApplyUCI([ 'network' ]);
 				}
 
 				preparePromise.then(function() {
@@ -209,9 +238,7 @@ return view.extend({
 							}
 						}
 
-						return uci.save().then(function() {
-							return uci.apply();
-						}).then(function() {
+						return commitAndApplyUCI([ 'network', 'firewall' ]).then(function() {
 							ui.hideModal();
 							ui.addNotification(null, E('p', _('Interface "%s" permanently deleted.').format(ifname)), 'success');
 							setTimeout(function() { window.location.reload(); }, 800);
@@ -479,8 +506,8 @@ return view.extend({
 								}
 							}
 
-							uci.save().then(function() {
-								return uci.apply();
+							commitAndApplyUCI([ 'network', 'firewall' ]).then(function() {
+								return callInterfaceUp(ifname).catch(function() { return null; });
 							}).then(function() {
 								ui.hideModal();
 								ui.addNotification(null, E('p', _('VPN interface "%s" successfully created!').format(ifname)), 'success');
@@ -766,9 +793,7 @@ return view.extend({
 								uci.set('network', ifname, 'peerdns', usePeerDns ? '1' : '0');
 							}
 
-							uci.save().then(function() {
-								return uci.apply();
-							}).then(function() {
+							commitAndApplyUCI([ 'network', 'firewall' ]).then(function() {
 								return callInterfaceDown(ifname).catch(function() { return null; });
 							}).then(function() {
 								return new Promise(function(resolve) { setTimeout(resolve, 1000); });

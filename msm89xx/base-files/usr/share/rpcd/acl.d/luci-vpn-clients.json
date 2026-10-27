@@ -19,7 +19,7 @@
 			"ubus": {
 				"network.interface": [ "up", "down" ],
 				"network.interface.*": [ "up", "down" ],
-				"uci": [ "add", "apply", "confirm", "delete", "order", "rename", "set" ]
+				"uci": [ "add", "apply", "commit", "confirm", "delete", "order", "reload_config", "rename", "set" ]
 			},
 			"uci": [ "network", "openvpn", "firewall" ]
 		}
