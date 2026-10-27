@@ -156,8 +156,16 @@ return view.extend({
 			currentlyUp,
 			function() {
 				ui.showModal(null, [ E('p', { 'class': 'spinning' }, (currentlyUp ? _('Stopping %s…') : _('Starting %s…')).format(ifname)) ]);
-				var p = currentlyUp ? callInterfaceDown(ifname) : callInterfaceUp(ifname);
-				p.then(function() {
+
+				var preparePromise = Promise.resolve();
+				if (!currentlyUp && uci.get('network', ifname, 'disabled') === '1') {
+					uci.unset('network', ifname, 'disabled');
+					preparePromise = uci.save().then(function() { return uci.apply(); });
+				}
+
+				preparePromise.then(function() {
+					return currentlyUp ? callInterfaceDown(ifname) : callInterfaceUp(ifname);
+				}).then(function() {
 					ui.hideModal();
 					ui.addNotification(null, E('p', (currentlyUp ? _('Interface "%s" stopped.') : _('Interface "%s" started.')).format(ifname)), currentlyUp ? 'info' : 'success');
 				}).catch(function(err) {
@@ -179,11 +187,11 @@ return view.extend({
 				ui.showModal(null, [ E('p', { 'class': 'spinning' }, _('Deleting interface %s…').format(ifname)) ]);
 				callInterfaceDown(ifname).catch(function() { return null; }).then(function() {
 					try {
-						uci.delete('network', ifname);
+						uci.remove('network', ifname);
 
 						if (proto === 'wireguard') {
 							uci.sections('network', 'wireguard_' + ifname, function(s) {
-								uci.delete('network', s['.name']);
+								uci.remove('network', s['.name']);
 							});
 						}
 
@@ -249,7 +257,7 @@ return view.extend({
 						'type': 'text',
 						'class': 'cbi-input-text',
 						'id': 'vpn_server',
-						'placeholder': isWireGuard ? '49.50.10.155:13231' : '49.50.10.155',
+						'placeholder': isWireGuard ? 'vpn.example.com:51820 or 203.0.113.10:51820' : 'vpn.example.com or 203.0.113.10',
 						'style': 'width: 100%;'
 					})
 				])
@@ -550,7 +558,7 @@ return view.extend({
 						'class': 'cbi-input-text',
 						'id': 'edit_vpn_server',
 						'value': curServer,
-						'placeholder': isWireGuard ? '49.50.10.155:13231' : '49.50.10.155',
+						'placeholder': isWireGuard ? 'vpn.example.com:51820 or 203.0.113.10:51820' : 'vpn.example.com or 203.0.113.10',
 						'style': 'width: 100%;'
 					})
 				])
@@ -791,10 +799,46 @@ return view.extend({
 
 		var devStats = parseDevStats(devStatsText);
 
-		var vpnIfaces = ifaces.filter(function(ifc) {
-			var p = ifc.proto || '';
+		// Map active interfaces from netifd dump
+		var dumpMap = {};
+		(ifaces || []).forEach(function(ifc) {
+			if (ifc && ifc.interface) dumpMap[ifc.interface] = ifc;
+		});
+
+		// Fetch all defined VPN interfaces from UCI network configuration
+		var uciSections = uci.sections('network', 'interface') || [];
+		var vpnNames = [];
+		var vpnIfaces = [];
+
+		uciSections.forEach(function(s) {
+			var n = s['.name'] || '';
+			var p = s.proto || '';
+			if (p === 'wireguard' || p === 'pptp' || p === 'l2tp' || p === 'sstp' || p === 'openvpn' || n.indexOf('vpn') >= 0) {
+				vpnNames.push(n);
+				var dumpIfc = dumpMap[n];
+				if (dumpIfc) {
+					vpnIfaces.push(dumpIfc);
+				} else {
+					vpnIfaces.push({
+						interface: n,
+						proto: p,
+						up: false,
+						l3_device: '-',
+						device: s.device || '-',
+						'ipv4-address': [],
+						uptime: 0
+					});
+				}
+			}
+		});
+
+		// Also include any dump interface that might not be in uci
+		(ifaces || []).forEach(function(ifc) {
 			var n = ifc.interface || '';
-			return (p === 'wireguard' || p === 'pptp' || p === 'l2tp' || p === 'sstp' || p === 'openvpn' || n.indexOf('vpn') >= 0);
+			var p = ifc.proto || '';
+			if (vpnNames.indexOf(n) === -1 && (p === 'wireguard' || p === 'pptp' || p === 'l2tp' || p === 'sstp' || p === 'openvpn' || n.indexOf('vpn') >= 0)) {
+				vpnIfaces.push(ifc);
+			}
 		});
 
 		var emptyRow = document.getElementById('vpn_empty_row');
