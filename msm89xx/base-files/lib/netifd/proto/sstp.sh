@@ -55,9 +55,6 @@ proto_sstp_setup() {
 		/sbin/insmod $module 2>&- >&-
 	done
 
-	proto_init_update "$ifname" 1
-	proto_send_update "$config"
-
 	proto_run_command "$config" sstpc \
 		--speed 115200 \
 		--cert-warn \
@@ -69,6 +66,7 @@ proto_sstp_setup() {
 		$sstp_options \
 		"$server${port:+:$port}" \
 		ifname "$ifname" \
+		ipparam "$config" \
 		require-mschap-v2 \
 		refuse-pap \
 		noauth \
@@ -78,10 +76,6 @@ proto_sstp_setup() {
 		ip-down-script /lib/netifd/ppp-down \
 		${mtu:+mtu $mtu mru $mtu} \
 		$pppd_options
-
-	sleep 5
-	proto_init_update "$ifname" 1
-	proto_send_update "$config"
 }
 
 proto_sstp_teardown() {
