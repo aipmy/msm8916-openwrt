@@ -11551,13 +11551,4 @@ body.login-page .login-password-toggle:focus-visible {
     .vpn-col-hide-mobile {
         display: none !important;
     }
-    .vpn-table th, .vpn-table td {
-        padding: 5px 3px !important;
-        font-size: 10.5px !important;
-    }
-    .vpn-action-btn {
-        width: 25px !important;
-        height: 25px !important;
-        margin: 0 1px !important;
-    }
 }

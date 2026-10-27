@@ -102,10 +102,10 @@ function formatSpeed(bytesPerSec) {
 	return (bytesPerSec / 1048576).toFixed(2) + ' MB/s';
 }
 
-function renderTrafficHTML(rxStr, txStr) {
-	return '<span style="color: #10b981; font-weight: 700; margin-right: 3px;">↓</span>' + rxStr +
-	       '<span style="display: inline-block; width: 10px;"></span>' +
-	       '<span style="color: #38bdf8; font-weight: 700; margin-right: 3px;">↑</span>' + txStr;
+function renderTrafficHTML(rxSpeed, rxTotal, txSpeed, txTotal) {
+	return '<span style="color: #10b981; font-weight: 700; margin-right: 3px;">↓</span>' + rxSpeed + ' <span style="opacity: 0.65; font-size: 10px;">(' + rxTotal + ')</span>' +
+	       '&nbsp;&nbsp;&nbsp;' +
+	       '<span style="color: #38bdf8; font-weight: 700; margin-right: 3px;">↑</span>' + txSpeed + ' <span style="opacity: 0.65; font-size: 10px;">(' + txTotal + ')</span>';
 }
 
 function renderSvgIcon(type) {
@@ -1003,8 +1003,7 @@ return view.extend({
 			var txSpeed = (isUp && stats.tx >= prev.tx) ? (stats.tx - prev.tx) / timeDelta : 0;
 			self.prevTraffic[devName] = { rx: stats.rx, tx: stats.tx };
 
-			var speedHTML = renderTrafficHTML(formatSpeed(rxSpeed), formatSpeed(txSpeed));
-			var totalHTML = renderTrafficHTML(formatBytes(stats.rx), formatBytes(stats.tx));
+			var trafficHTML = renderTrafficHTML(formatSpeed(rxSpeed), formatBytes(stats.rx), formatSpeed(txSpeed), formatBytes(stats.tx));
 
 			// Routing & Peer IP details
 			var isDefRoute = (uci.get('network', ifc.interface, 'defaultroute') === '1');
@@ -1031,11 +1030,8 @@ return view.extend({
 					if (peerIp) ipCell.title = _('Peer IP: ') + peerIp;
 				}
 
-				var speedCell = row.querySelector('.vpn-speed-cell');
-				if (speedCell) speedCell.innerHTML = speedHTML;
-
-				var totalCell = row.querySelector('.vpn-total-cell');
-				if (totalCell) totalCell.innerHTML = totalHTML;
+				var trafficCell = row.querySelector('.vpn-traffic-cell');
+				if (trafficCell) trafficCell.innerHTML = trafficHTML;
 
 				var uptimeCell = row.querySelector('.vpn-uptime-cell');
 				if (uptimeCell) uptimeCell.textContent = ifc.uptime ? '%t'.format(ifc.uptime) : '-';
@@ -1048,14 +1044,16 @@ return view.extend({
 				}
 			} else {
 				var newRow = E('tr', { 'class': 'tr vpn-data-row', 'id': rowId, 'style': 'border-bottom: 1px solid rgba(255,255,255,0.04);' }, [
-					// 1. Interface
+					// 1. Interface (Dot & Name permanently bound together)
 					E('td', { 'class': 'td vpn-interface-cell', 'style': 'font-weight: 600;' }, [
-						E('span', {
-							'class': 'vpn-status-dot',
-							'title': dotTitle,
-							'style': 'display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: middle; cursor: help; background: ' + dotColor + ';' + (isConnecting ? ' box-shadow: 0 0 6px rgba(245, 158, 11, 0.7);' : (isUp && hasIp ? ' box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);' : ''))
-						}),
-						E('span', { 'class': 'vpn-ifname-text' }, ifc.interface)
+						E('div', { 'class': 'vpn-ifname-box', 'style': 'display: inline-flex; align-items: center; gap: 7px;' }, [
+							E('span', {
+								'class': 'vpn-status-dot',
+								'title': dotTitle,
+								'style': 'width: 7px; height: 7px; min-width: 7px; min-height: 7px; border-radius: 50%; background: ' + dotColor + '; flex-shrink: 0;' + (isConnecting ? ' box-shadow: 0 0 6px rgba(245, 158, 11, 0.7);' : (isUp && hasIp ? ' box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);' : ''))
+							}),
+							E('span', { 'class': 'vpn-ifname-text' }, ifc.interface)
+						])
 					]),
 					// 2. Protocol (Desktop)
 					E('td', { 'class': 'td vpn-proto-cell' }, [
@@ -1072,16 +1070,10 @@ return view.extend({
 					]),
 					// 4. Assigned IP
 					E('td', { 'class': 'td vpn-ip-cell', 'style': 'font-family: monospace; color: ' + (assignedIp !== '-' ? '#38bdf8' : 'inherit') + ';', 'title': peerIp ? (_('Peer IP: ') + peerIp) : '' }, assignedIp),
-					// 5. Speed (Rate)
+					// 5. Traffic (Rate / Total) unified
 					(function() {
-						var td = E('td', { 'class': 'td vpn-speed-cell', 'style': 'font-family: monospace; font-size: 11px; white-space: nowrap;' });
-						td.innerHTML = speedHTML;
-						return td;
-					})(),
-					// 6. Total Traffic
-					(function() {
-						var td = E('td', { 'class': 'td vpn-total-cell', 'style': 'font-family: monospace; font-size: 11px; white-space: nowrap;' });
-						td.innerHTML = totalHTML;
+						var td = E('td', { 'class': 'td vpn-traffic-cell', 'style': 'font-family: monospace; font-size: 11px; white-space: nowrap;' });
+						td.innerHTML = trafficHTML;
 						return td;
 					})(),
 					// 7. Uptime
@@ -1260,20 +1252,19 @@ return view.extend({
 			'  .vpn-col-hide-mobile { display: none !important; }',
 			'  .vpn-interface-cell {',
 			'    display: flex !important; justify-content: flex-start !important; align-items: center !important;',
-			'    gap: 8px !important; padding-bottom: 5px !important; border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;',
+			'    padding-bottom: 5px !important; border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;',
 			'    font-size: 13.5px !important;',
 			'  }',
-			'  .vpn-status-dot { flex-shrink: 0 !important; margin-right: 0 !important; }',
+			'  .vpn-ifname-box { display: inline-flex !important; align-items: center !important; gap: 7px !important; }',
+			'  .vpn-status-dot { width: 7px !important; height: 7px !important; min-width: 7px !important; min-height: 7px !important; flex-shrink: 0 !important; margin: 0 !important; }',
 			'  .vpn-proto-cell { font-size: 11.5px !important; }',
 			'  .vpn-proto-cell::before { content: "Protocol:"; color: var(--text-color-medium, #94a3b8); font-size: 11px; }',
 			'  .vpn-route-cell { font-size: 11px !important; }',
 			'  .vpn-route-cell::before { content: "Routing:"; color: var(--text-color-medium, #94a3b8); font-size: 11px; }',
 			'  .vpn-ip-cell { font-size: 11.5px !important; }',
 			'  .vpn-ip-cell::before { content: "IP Address:"; color: var(--text-color-medium, #94a3b8); font-size: 11px; }',
-			'  .vpn-speed-cell { font-size: 11px !important; }',
-			'  .vpn-speed-cell::before { content: "Speed (Rate):"; color: var(--text-color-medium, #94a3b8); font-size: 11px; }',
-			'  .vpn-total-cell { font-size: 11px !important; }',
-			'  .vpn-total-cell::before { content: "Total Traffic:"; color: var(--text-color-medium, #94a3b8); font-size: 11px; }',
+			'  .vpn-traffic-cell { font-size: 11px !important; }',
+			'  .vpn-traffic-cell::before { content: "Traffic:"; color: var(--text-color-medium, #94a3b8); font-size: 11px; }',
 			'  .vpn-uptime-cell { display: flex !important; font-size: 11px !important; }',
 			'  .vpn-uptime-cell::before { content: "Uptime:"; color: var(--text-color-medium, #94a3b8); font-size: 11px; }',
 			'  .vpn-actions-cell {',
@@ -1350,15 +1341,14 @@ return view.extend({
 					E('th', { 'class': 'th' }, _('Protocol')),
 					E('th', { 'class': 'th' }, _('Routing')),
 					E('th', { 'class': 'th' }, _('Assigned IP')),
-					E('th', { 'class': 'th' }, _('Speed (Rate)')),
-					E('th', { 'class': 'th' }, _('Total Traffic')),
+					E('th', { 'class': 'th' }, _('Traffic (Rate / Total)')),
 					E('th', { 'class': 'th vpn-col-hide-mobile' }, _('Uptime')),
 					E('th', { 'class': 'th', 'style': 'text-align: right;' }, _('Actions'))
 				])
 			]),
 			E('tbody', { 'id': 'vpn_tunnels_tbody' }, [
 				E('tr', { 'id': 'vpn_empty_row', 'style': 'display: none;' }, [
-					E('td', { 'colspan': '8', 'style': 'text-align: center; padding: 14px; color: var(--text-color-medium, #94a3b8); font-size: 11.5px;' }, _('No active VPN connections.'))
+					E('td', { 'colspan': '7', 'style': 'text-align: center; padding: 14px; color: var(--text-color-medium, #94a3b8); font-size: 11.5px;' }, _('No active VPN connections.'))
 				])
 			])
 		]);
