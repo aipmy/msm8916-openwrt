@@ -5577,17 +5577,17 @@ body.modal-overlay-active #modal_overlay {
 
     #modal_overlay>.modal .cbi-value:has(.cbi-checkbox),
     #modal_overlay>.modal .cbi-value:has(.cbi-value-field > input[type="checkbox"]) {
-        display: grid;
-        grid-template-columns: auto 1fr;
-        grid-template-rows: auto auto;
-        column-gap: 10px;
-        row-gap: 0;
+        display: flex;
+        flex-direction: row;
         align-items: center;
+        justify-content: space-between;
     }
 
     #modal_overlay>.modal .cbi-value:has(.cbi-checkbox) .cbi-value-field,
     #modal_overlay>.modal .cbi-value:has(.cbi-value-field > input[type="checkbox"]) .cbi-value-field {
-        display: contents;
+        display: flex;
+        align-items: center;
+        width: auto;
     }
 
     #modal_overlay>.modal .cbi-value-title {

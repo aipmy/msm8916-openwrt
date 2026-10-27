@@ -42,7 +42,8 @@ define Device/yiming-uz801v3
 		block-mount f2fs-tools tar \
 		msm-firmware-dumper reboot-edl qcom-carrier-autocfg \
 		diag-efs diag-logtool luci-theme-proton2025 libcurl curl \
-		ttyd luci-app-ttyd ppp-mod-pptp kmod-pptp kmod-mppe
+		ttyd luci-app-ttyd ppp-mod-pptp kmod-pptp kmod-mppe \
+		sstp-client luci-proto-sstp
 endef
 TARGET_DEVICES += yiming-uz801v3
 

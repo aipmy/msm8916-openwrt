@@ -63,6 +63,22 @@ return view.extend({
 				])
 			])
 		]);
+			if (protoId === 'sstp') {
+				body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
+					E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('Port')),
+					E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%;' }, [
+						E('input', {
+							'type': 'number',
+							'class': 'cbi-input-text',
+							'id': 'vpn_port',
+							'value': '443',
+							'placeholder': '443 or 4430',
+							'style': 'width: 100%;'
+						})
+					])
+				]));
+			}
+
 
 		if (isWireGuard) {
 			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
@@ -154,27 +170,25 @@ return view.extend({
 				])
 			]));
 
-			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 10px;' }, [
-				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('Add Default Route')),
-				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%; display: flex; align-items: center;' }, [
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: auto;' }, _('Add Default Route')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: auto; margin: 0;' }, [
 					E('input', {
 						'type': 'checkbox',
 						'id': 'vpn_defaultroute',
-						'style': 'width: 18px; height: 18px;'
-					}),
-					E('span', { 'style': 'margin-left: 8px; color: var(--text-color-medium, #94a3b8); font-size: 12px;' }, _('Route all internet traffic through VPN'))
+						'style': 'cursor: pointer;'
+					})
 				])
 			]));
 
-			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 10px;' }, [
-				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('Use Peer DNS')),
-				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%; display: flex; align-items: center;' }, [
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: auto;' }, _('Use Peer DNS')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: auto; margin: 0;' }, [
 					E('input', {
 						'type': 'checkbox',
 						'id': 'vpn_peerdns',
-						'style': 'width: 18px; height: 18px;'
-					}),
-					E('span', { 'style': 'margin-left: 8px; color: var(--text-color-medium, #94a3b8); font-size: 12px;' }, _('Obtain DNS servers from MikroTik peer'))
+						'style': 'cursor: pointer;'
+					})
 				])
 			]));
 		}
@@ -208,6 +222,10 @@ return view.extend({
 							uci.set('network', ifname, 'interface');
 							uci.set('network', ifname, 'proto', protoId);
 							uci.set('network', ifname, 'server', server);
+							if (protoId === 'sstp') {
+								var port = (document.getElementById('vpn_port')?.value || '443').trim();
+								uci.set('network', ifname, 'port', port);
+							}
 							uci.set('network', ifname, 'ipv6', '0');
 
 							if (isWireGuard) {
