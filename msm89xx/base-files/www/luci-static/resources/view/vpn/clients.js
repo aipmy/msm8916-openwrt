@@ -34,12 +34,12 @@ return view.extend({
 		var body = E('div', { 'style': 'font-size: 13px;' }, [
 			E('p', { 'style': 'color: var(--text-color-medium, #94a3b8); margin-bottom: 16px; line-height: 1.5;' }, 
 				isWireGuard 
-					? _('Paste your WireGuard configuration file (.conf) content or fill the quick setup parameters below.') 
-					: _('Enter your VPN server details and credentials. An uplink interface and WAN firewall zone will be configured automatically.')
+					? _('Configure your WireGuard client interface to MikroTik / peer server.') 
+					: _('MikroTik-compatible PPP Client Dial-Out setup. An uplink interface and WAN firewall zone will be attached automatically.')
 			),
 			E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
-				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 30%;' }, _('Interface Name')),
-				E('div', { 'class': 'cbi-value-field', 'style': 'width: 70%;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('Interface Name')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%;' }, [
 					E('input', {
 						'type': 'text',
 						'class': 'cbi-input-text',
@@ -49,37 +49,37 @@ return view.extend({
 						'style': 'width: 100%;'
 					})
 				])
+			]),
+			E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('Connect To (Server / IP)')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%;' }, [
+					E('input', {
+						'type': 'text',
+						'class': 'cbi-input-text',
+						'id': 'vpn_server',
+						'placeholder': isWireGuard ? '49.50.10.155:13231' : '49.50.10.155',
+						'style': 'width: 100%;'
+					})
+				])
 			])
 		]);
 
 		if (isWireGuard) {
 			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
-				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 30%;' }, _('Peer Endpoint')),
-				E('div', { 'class': 'cbi-value-field', 'style': 'width: 70%;' }, [
-					E('input', {
-						'type': 'text',
-						'class': 'cbi-input-text',
-						'id': 'vpn_server',
-						'placeholder': 'vpn.example.com:51820',
-						'style': 'width: 100%;'
-					})
-				])
-			]));
-			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
-				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 30%;' }, _('Interface IP Address')),
-				E('div', { 'class': 'cbi-value-field', 'style': 'width: 70%;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('Client IP Address')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%;' }, [
 					E('input', {
 						'type': 'text',
 						'class': 'cbi-input-text',
 						'id': 'vpn_client_ip',
-						'placeholder': '10.0.0.2/24',
+						'placeholder': '10.50.10.50/24',
 						'style': 'width: 100%;'
 					})
 				])
 			]));
 			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
-				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 30%;' }, _('Client Private Key')),
-				E('div', { 'class': 'cbi-value-field', 'style': 'width: 70%;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('Client Private Key')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%;' }, [
 					E('input', {
 						'type': 'password',
 						'class': 'cbi-input-text',
@@ -90,58 +90,97 @@ return view.extend({
 				])
 			]));
 			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
-				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 30%;' }, _('Peer Public Key')),
-				E('div', { 'class': 'cbi-value-field', 'style': 'width: 70%;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('MikroTik Public Key')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%;' }, [
 					E('input', {
 						'type': 'text',
 						'class': 'cbi-input-text',
 						'id': 'vpn_pubkey',
-						'placeholder': 'Base64 Public Key',
+						'placeholder': 'f1F7zU8lsZ7sOeOs0nBNBYr6CM7xXRCUOc/D2E8gM2M=',
+						'style': 'width: 100%;'
+					})
+				])
+			]));
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('Allowed IPs')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%;' }, [
+					E('input', {
+						'type': 'text',
+						'class': 'cbi-input-text',
+						'id': 'vpn_allowed_ips',
+						'value': '10.50.10.0/24',
+						'placeholder': '10.50.10.0/24 or 0.0.0.0/0',
 						'style': 'width: 100%;'
 					})
 				])
 			]));
 		} else {
 			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
-				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 30%;' }, _('Server Host / IP')),
-				E('div', { 'class': 'cbi-value-field', 'style': 'width: 70%;' }, [
-					E('input', {
-						'type': 'text',
-						'class': 'cbi-input-text',
-						'id': 'vpn_server',
-						'placeholder': 'vpn.mycompany.com or 203.0.113.1',
-						'style': 'width: 100%;'
-					})
-				])
-			]));
-			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
-				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 30%;' }, _('Username')),
-				E('div', { 'class': 'cbi-value-field', 'style': 'width: 70%;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('User')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%;' }, [
 					E('input', {
 						'type': 'text',
 						'class': 'cbi-input-text',
 						'id': 'vpn_username',
-						'placeholder': 'Username',
+						'placeholder': 'PPP Username',
 						'style': 'width: 100%;'
 					})
 				])
 			]));
 			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
-				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 30%;' }, _('Password')),
-				E('div', { 'class': 'cbi-value-field', 'style': 'width: 70%;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('Password')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%;' }, [
 					E('input', {
 						'type': 'password',
 						'class': 'cbi-input-text',
 						'id': 'vpn_password',
-						'placeholder': 'Password',
+						'placeholder': 'PPP Password',
 						'style': 'width: 100%;'
 					})
+				])
+			]));
+
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('Keepalive Timeout (s)')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%;' }, [
+					E('input', {
+						'type': 'number',
+						'class': 'cbi-input-text',
+						'id': 'vpn_keepalive',
+						'value': '30',
+						'placeholder': '30',
+						'style': 'width: 100%;'
+					})
+				])
+			]));
+
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 10px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('Add Default Route')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%; display: flex; align-items: center;' }, [
+					E('input', {
+						'type': 'checkbox',
+						'id': 'vpn_defaultroute',
+						'style': 'width: 18px; height: 18px;'
+					}),
+					E('span', { 'style': 'margin-left: 8px; color: var(--text-color-medium, #94a3b8); font-size: 12px;' }, _('Route all internet traffic through VPN'))
+				])
+			]));
+
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 10px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 35%;' }, _('Use Peer DNS')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 65%; display: flex; align-items: center;' }, [
+					E('input', {
+						'type': 'checkbox',
+						'id': 'vpn_peerdns',
+						'style': 'width: 18px; height: 18px;'
+					}),
+					E('span', { 'style': 'margin-left: 8px; color: var(--text-color-medium, #94a3b8); font-size: 12px;' }, _('Obtain DNS servers from MikroTik peer'))
 				])
 			]));
 		}
 
 		var self = this;
-		var modal = ui.showModal(_('Quick Setup: ') + protoTitle, [
+		var modal = ui.showModal(_('MikroTik Client Setup: ') + protoTitle, [
 			body,
 			E('div', { 'class': 'right', 'style': 'margin-top: 20px; display: flex; justify-content: flex-end; gap: 8px;' }, [
 				E('button', {
@@ -166,15 +205,16 @@ return view.extend({
 						ui.showModal(null, [ E('p', { 'class': 'spinning' }, _('Saving VPN Interface…')) ]);
 
 						try {
-							// Create or replace network interface
 							uci.set('network', ifname, 'interface');
 							uci.set('network', ifname, 'proto', protoId);
 							uci.set('network', ifname, 'server', server);
+							uci.set('network', ifname, 'ipv6', '0');
 
 							if (isWireGuard) {
 								var privKey = (document.getElementById('vpn_privkey').value || '').trim();
 								var pubKey = (document.getElementById('vpn_pubkey').value || '').trim();
 								var clientIp = (document.getElementById('vpn_client_ip').value || '').trim();
+								var allowedIps = (document.getElementById('vpn_allowed_ips').value || '0.0.0.0/0').trim();
 
 								if (privKey) uci.set('network', ifname, 'private_key', privKey);
 								if (clientIp) uci.set('network', ifname, 'addresses', [ clientIp ]);
@@ -183,7 +223,8 @@ return view.extend({
 									var peerSec = uci.add('network', 'wireguard_' + ifname);
 									uci.set('network', peerSec, 'public_key', pubKey);
 									uci.set('network', peerSec, 'route_allowed_ips', '1');
-									uci.set('network', peerSec, 'allowed_ips', [ '0.0.0.0/0', '::/0' ]);
+									uci.set('network', peerSec, 'allowed_ips', allowedIps.split(/\s*,\s*|\s+/));
+									uci.set('network', peerSec, 'persistent_keepalive', '25');
 									var parts = server.split(':');
 									if (parts.length === 2) {
 										uci.set('network', peerSec, 'endpoint_host', parts[0]);
@@ -195,12 +236,18 @@ return view.extend({
 							} else {
 								var user = (document.getElementById('vpn_username').value || '').trim();
 								var pass = (document.getElementById('vpn_password').value || '').trim();
+								var keepalive = parseInt(document.getElementById('vpn_keepalive').value || '30', 10);
+								var addDefaultRoute = document.getElementById('vpn_defaultroute').checked;
+								var usePeerDns = document.getElementById('vpn_peerdns').checked;
+
 								if (user) uci.set('network', ifname, 'username', user);
 								if (pass) uci.set('network', ifname, 'password', pass);
-								uci.set('network', ifname, 'defaultroute', '1');
+								
+								uci.set('network', ifname, 'keepalive', '5 ' + keepalive);
+								uci.set('network', ifname, 'defaultroute', addDefaultRoute ? '1' : '0');
+								uci.set('network', ifname, 'peerdns', usePeerDns ? '1' : '0');
 							}
 
-							// Attach interface to WAN firewall zone automatically for NAT/masquerade
 							var zones = uci.sections('firewall', 'zone');
 							for (var i = 0; i < zones.length; i++) {
 								if (zones[i].name === 'wan') {
