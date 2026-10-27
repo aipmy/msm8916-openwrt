@@ -853,11 +853,30 @@ return view.extend({
 		vpnIfaces.forEach(function(ifc) {
 			var rowId = 'vpn_row_' + ifc.interface;
 			var row = document.getElementById(rowId);
+			var isDisabled = (uci.get('network', ifc.interface, 'disabled') === '1');
 			var isUp = !!ifc.up;
+			var isPending = !!ifc.pending;
+			var hasIp = !!(ifc['ipv4-address'] && ifc['ipv4-address'].length && ifc['ipv4-address'][0].address);
 
 			var assignedIp = '-';
-			if (ifc['ipv4-address'] && ifc['ipv4-address'].length && ifc['ipv4-address'][0].address) {
+			if (hasIp) {
 				assignedIp = ifc['ipv4-address'][0].address;
+			}
+
+			var dotColor = '#ef4444'; // Red (Down)
+			var dotTitle = _('Disconnected / Down');
+			var isConnecting = false;
+
+			if (isDisabled) {
+				dotColor = '#64748b'; // Gray (Disabled)
+				dotTitle = _('Disabled');
+			} else if (isUp && hasIp) {
+				dotColor = '#10b981'; // Green (Connected / UP)
+				dotTitle = _('Connected / UP');
+			} else if (isPending || (isUp && !hasIp)) {
+				dotColor = '#f59e0b'; // Amber (Connecting / Dialing)
+				dotTitle = _('Connecting / Dialing…');
+				isConnecting = true;
 			}
 
 			var devName = ifc.l3_device || ifc.device || '';
@@ -866,7 +885,11 @@ return view.extend({
 
 			if (row) {
 				var dot = row.querySelector('.vpn-status-dot');
-				if (dot) dot.style.background = isUp ? '#10b981' : '#ef4444';
+				if (dot) {
+					dot.style.background = dotColor;
+					dot.title = dotTitle;
+					dot.style.boxShadow = isConnecting ? '0 0 6px rgba(245, 158, 11, 0.7)' : (isUp && hasIp ? '0 0 5px rgba(16, 185, 129, 0.5)' : 'none');
+				}
 
 				var ipCell = row.querySelector('.vpn-ip-cell');
 				if (ipCell) {
@@ -888,7 +911,11 @@ return view.extend({
 			} else {
 				var newRow = E('tr', { 'class': 'tr vpn-data-row', 'id': rowId, 'style': 'border-bottom: 1px solid rgba(255,255,255,0.04);' }, [
 					E('td', { 'class': 'td', 'style': 'font-weight: 600;' }, [
-						E('span', { 'class': 'vpn-status-dot', 'style': 'display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; background: ' + (isUp ? '#10b981' : '#ef4444') + ';' }),
+						E('span', {
+							'class': 'vpn-status-dot',
+							'title': dotTitle,
+							'style': 'display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: middle; cursor: help; background: ' + dotColor + ';' + (isConnecting ? ' box-shadow: 0 0 6px rgba(245, 158, 11, 0.7);' : (isUp && hasIp ? ' box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);' : ''))
+						}),
 						ifc.interface
 					]),
 					E('td', { 'class': 'td', 'style': 'text-transform: uppercase;' }, ifc.proto || '-'),
@@ -1080,10 +1107,28 @@ return view.extend({
 		// Active VPN Tunnels Section
 		var tunnelsCard = E('div', { 'class': 'vpn-section-card' });
 
-		tunnelsCard.appendChild(E('div', { 'style': 'display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;' }, [
+		tunnelsCard.appendChild(E('div', { 'style': 'display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;' }, [
 			E('div', {}, [
 				E('h3', { 'style': 'margin: 0 0 2px 0; font-size: 14px; font-weight: 600;' }, _('Active VPN Tunnels')),
 				E('p', { 'style': 'margin: 0; font-size: 11px; color: var(--text-color-medium, #94a3b8);' }, _('Connected VPN uplinks routing network traffic.'))
+			]),
+			E('div', { 'style': 'display: flex; align-items: center; gap: 10px; font-size: 10.5px; color: var(--text-color-medium, #94a3b8);' }, [
+				E('span', { 'style': 'display: flex; align-items: center; gap: 4px;' }, [
+					E('span', { 'style': 'width: 6px; height: 6px; border-radius: 50%; background: #10b981; box-shadow: 0 0 4px #10b981;' }),
+					_('Connected')
+				]),
+				E('span', { 'style': 'display: flex; align-items: center; gap: 4px;' }, [
+					E('span', { 'style': 'width: 6px; height: 6px; border-radius: 50%; background: #f59e0b; box-shadow: 0 0 4px #f59e0b;' }),
+					_('Connecting')
+				]),
+				E('span', { 'style': 'display: flex; align-items: center; gap: 4px;' }, [
+					E('span', { 'style': 'width: 6px; height: 6px; border-radius: 50%; background: #ef4444;' }),
+					_('Down')
+				]),
+				E('span', { 'style': 'display: flex; align-items: center; gap: 4px;' }, [
+					E('span', { 'style': 'width: 6px; height: 6px; border-radius: 50%; background: #64748b;' }),
+					_('Disabled')
+				])
 			])
 		]));
 
