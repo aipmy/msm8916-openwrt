@@ -6,10 +6,10 @@
 				"network.interface": [ "dump", "status" ],
 				"service": [ "list" ]
 			},
-			"uci": [ "network", "openvpn" ]
+			"uci": [ "network", "openvpn", "firewall" ]
 		},
 		"write": {
-			"uci": [ "network", "openvpn" ]
+			"uci": [ "network", "openvpn", "firewall" ]
 		}
 	}
 }

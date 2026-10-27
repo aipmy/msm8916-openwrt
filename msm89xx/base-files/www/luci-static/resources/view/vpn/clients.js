@@ -24,59 +24,240 @@ return view.extend({
 			callNetworkDump(),
 			callServiceList(),
 			uci.load('network'),
-			uci.load('openvpn').catch(function() { return null; })
+			uci.load('firewall').catch(function() { return null; })
+		]);
+	},
+
+	openQuickSetupModal: function(protoId, protoTitle) {
+		var isWireGuard = (protoId === 'wireguard');
+
+		var body = E('div', { 'style': 'font-size: 13px;' }, [
+			E('p', { 'style': 'color: var(--text-color-medium, #94a3b8); margin-bottom: 16px; line-height: 1.5;' }, 
+				isWireGuard 
+					? _('Paste your WireGuard configuration file (.conf) content or fill the quick setup parameters below.') 
+					: _('Enter your VPN server details and credentials. An uplink interface and WAN firewall zone will be configured automatically.')
+			),
+			E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 30%;' }, _('Interface Name')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 70%;' }, [
+					E('input', {
+						'type': 'text',
+						'class': 'cbi-input-text',
+						'id': 'vpn_ifname',
+						'value': 'vpn_' + protoId,
+						'placeholder': 'vpn_' + protoId,
+						'style': 'width: 100%;'
+					})
+				])
+			])
+		]);
+
+		if (isWireGuard) {
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 30%;' }, _('Peer Endpoint')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 70%;' }, [
+					E('input', {
+						'type': 'text',
+						'class': 'cbi-input-text',
+						'id': 'vpn_server',
+						'placeholder': 'vpn.example.com:51820',
+						'style': 'width: 100%;'
+					})
+				])
+			]));
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 30%;' }, _('Interface IP Address')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 70%;' }, [
+					E('input', {
+						'type': 'text',
+						'class': 'cbi-input-text',
+						'id': 'vpn_client_ip',
+						'placeholder': '10.0.0.2/24',
+						'style': 'width: 100%;'
+					})
+				])
+			]));
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 30%;' }, _('Client Private Key')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 70%;' }, [
+					E('input', {
+						'type': 'password',
+						'class': 'cbi-input-text',
+						'id': 'vpn_privkey',
+						'placeholder': 'Base64 Private Key',
+						'style': 'width: 100%;'
+					})
+				])
+			]));
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 30%;' }, _('Peer Public Key')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 70%;' }, [
+					E('input', {
+						'type': 'text',
+						'class': 'cbi-input-text',
+						'id': 'vpn_pubkey',
+						'placeholder': 'Base64 Public Key',
+						'style': 'width: 100%;'
+					})
+				])
+			]));
+		} else {
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 30%;' }, _('Server Host / IP')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 70%;' }, [
+					E('input', {
+						'type': 'text',
+						'class': 'cbi-input-text',
+						'id': 'vpn_server',
+						'placeholder': 'vpn.mycompany.com or 203.0.113.1',
+						'style': 'width: 100%;'
+					})
+				])
+			]));
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 30%;' }, _('Username')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 70%;' }, [
+					E('input', {
+						'type': 'text',
+						'class': 'cbi-input-text',
+						'id': 'vpn_username',
+						'placeholder': 'Username',
+						'style': 'width: 100%;'
+					})
+				])
+			]));
+			body.appendChild(E('div', { 'class': 'cbi-value', 'style': 'margin-bottom: 12px;' }, [
+				E('label', { 'class': 'cbi-value-title', 'style': 'font-weight: 600; width: 30%;' }, _('Password')),
+				E('div', { 'class': 'cbi-value-field', 'style': 'width: 70%;' }, [
+					E('input', {
+						'type': 'password',
+						'class': 'cbi-input-text',
+						'id': 'vpn_password',
+						'placeholder': 'Password',
+						'style': 'width: 100%;'
+					})
+				])
+			]));
+		}
+
+		var self = this;
+		var modal = ui.showModal(_('Quick Setup: ') + protoTitle, [
+			body,
+			E('div', { 'class': 'right', 'style': 'margin-top: 20px; display: flex; justify-content: flex-end; gap: 8px;' }, [
+				E('button', {
+					'class': 'cbi-button cbi-button-neutral',
+					'click': ui.hideModal
+				}, _('Cancel')),
+				E('button', {
+					'class': 'cbi-button cbi-button-action',
+					'click': function(ev) {
+						var ifname = (document.getElementById('vpn_ifname').value || '').trim();
+						var server = (document.getElementById('vpn_server').value || '').trim();
+
+						if (!ifname) {
+							ui.addNotification(null, E('p', _('Interface name is required.')), 'error');
+							return;
+						}
+						if (!server) {
+							ui.addNotification(null, E('p', _('Server address is required.')), 'error');
+							return;
+						}
+
+						ui.showModal(null, [ E('p', { 'class': 'spinning' }, _('Saving VPN Interface…')) ]);
+
+						try {
+							// Create or replace network interface
+							uci.set('network', ifname, 'interface');
+							uci.set('network', ifname, 'proto', protoId);
+							uci.set('network', ifname, 'server', server);
+
+							if (isWireGuard) {
+								var privKey = (document.getElementById('vpn_privkey').value || '').trim();
+								var pubKey = (document.getElementById('vpn_pubkey').value || '').trim();
+								var clientIp = (document.getElementById('vpn_client_ip').value || '').trim();
+
+								if (privKey) uci.set('network', ifname, 'private_key', privKey);
+								if (clientIp) uci.set('network', ifname, 'addresses', [ clientIp ]);
+
+								if (pubKey) {
+									var peerSec = uci.add('network', 'wireguard_' + ifname);
+									uci.set('network', peerSec, 'public_key', pubKey);
+									uci.set('network', peerSec, 'route_allowed_ips', '1');
+									uci.set('network', peerSec, 'allowed_ips', [ '0.0.0.0/0', '::/0' ]);
+									var parts = server.split(':');
+									if (parts.length === 2) {
+										uci.set('network', peerSec, 'endpoint_host', parts[0]);
+										uci.set('network', peerSec, 'endpoint_port', parts[1]);
+									} else {
+										uci.set('network', peerSec, 'endpoint_host', server);
+									}
+								}
+							} else {
+								var user = (document.getElementById('vpn_username').value || '').trim();
+								var pass = (document.getElementById('vpn_password').value || '').trim();
+								if (user) uci.set('network', ifname, 'username', user);
+								if (pass) uci.set('network', ifname, 'password', pass);
+								uci.set('network', ifname, 'defaultroute', '1');
+							}
+
+							// Attach interface to WAN firewall zone automatically for NAT/masquerade
+							var zones = uci.sections('firewall', 'zone');
+							for (var i = 0; i < zones.length; i++) {
+								if (zones[i].name === 'wan') {
+									var curNetworks = uci.get('firewall', zones[i]['.name'], 'network') || [];
+									if (!Array.isArray(curNetworks)) curNetworks = curNetworks.split(/\s+/);
+									if (curNetworks.indexOf(ifname) === -1) {
+										curNetworks.push(ifname);
+										uci.set('firewall', zones[i]['.name'], 'network', curNetworks);
+									}
+									break;
+								}
+							}
+
+							uci.save().then(function() {
+								return uci.apply();
+							}).then(function() {
+								ui.hideModal();
+								ui.addNotification(null, E('p', _('VPN interface "%s" successfully created!').format(ifname)), 'info');
+								window.location.reload();
+							}).catch(function(err) {
+								ui.hideModal();
+								ui.addNotification(null, E('p', _('Failed to apply configuration: ') + (err.message || err)), 'error');
+							});
+						} catch (e) {
+							ui.hideModal();
+							ui.addNotification(null, E('p', _('Error: ') + e.message), 'error');
+						}
+					}
+				}, _('Connect & Save'))
+			])
 		]);
 	},
 
 	render: function(data) {
 		var ifaces = data[0] || [];
-		var services = data[1] || {};
-		var openvpnLoaded = !!data[3];
+		var self = this;
 
 		// Detect active VPN interfaces
 		var vpnIfaces = ifaces.filter(function(ifc) {
 			var p = ifc.proto || '';
 			var n = ifc.interface || '';
-			return (p === 'pptp' || p === 'l2tp' || p === 'sstp' || p === 'wireguard' || p === 'openvpn' || n.indexOf('vpn') >= 0);
+			return (p === 'wireguard' || p === 'pptp' || p === 'l2tp' || p === 'sstp' || p === 'openvpn' || n.indexOf('vpn') >= 0);
 		});
-
-		var isOpenvpnRunning = services.openvpn && services.openvpn.instances && Object.keys(services.openvpn.instances).length > 0;
-		var isSwanctlRunning = services.swanctl && services.swanctl.instances && Object.keys(services.swanctl.instances).length > 0;
 
 		var protocols = [
 			{
-				id: 'openvpn',
-				name: 'OpenVPN Client',
-				badge: 'SSL/TLS Tunnel',
-				badgeColor: '#3b82f6',
-				desc: _('Industry-standard SSL/TLS VPN client supporting AES-256-GCM, TLS-Crypt, and single-file .ovpn profiles.'),
-				port: 'UDP 1194 / TCP 443',
-				crypto: 'AES-GCM, ChaCha20-Poly1305',
-				layer: 'Layer 3 (TUN) / Layer 2 (TAP)',
-				status: isOpenvpnRunning ? _('Active / Running') : _('Ready (Service Installed)'),
-				statusColor: isOpenvpnRunning ? '#10b981' : '#64748b',
-				primaryBtn: {
-					label: _('OpenVPN Manager'),
-					url: L.url('admin/vpn/openvpn'),
-					class: 'cbi-button cbi-button-action'
-				}
-			},
-			{
-				id: 'ipsec',
-				name: 'strongSwan IPsec / IKEv2',
-				badge: 'IKEv1 / IKEv2',
-				badgeColor: '#8b5cf6',
-				desc: _('Enterprise-grade IPsec client compatible with Cisco ASA, MikroTik RouterOS, FortiGate, and pfSense/OPNsense gateways.'),
-				port: 'UDP 500 / UDP 4500 (NAT-T)',
-				crypto: 'AES-256-GCM, SHA2-384, DH Group 14/19',
-				layer: 'Layer 3 ESP IPsec Tunnel',
-				status: isSwanctlRunning ? _('Active / Running') : _('Ready (swanctl Installed)'),
-				statusColor: isSwanctlRunning ? '#10b981' : '#64748b',
-				primaryBtn: {
-					label: _('IPsec / swanctl Manager'),
-					url: L.url('admin/vpn/strongswan-swanctl'),
-					class: 'cbi-button cbi-button-action'
-				}
+				id: 'wireguard',
+				name: 'WireGuard',
+				badge: 'Fast & Modern (Recommended)',
+				badgeColor: '#10b981',
+				desc: _('Next-generation, ultra-fast VPN with state-of-the-art cryptography (ChaCha20, Curve25519). Native kernel acceleration with lowest battery and memory overhead.'),
+				port: 'UDP 51820',
+				crypto: 'ChaCha20-Poly1305, Curve25519',
+				layer: 'Layer 3 Kernel Crypto',
+				status: _('Kernel Accelerated'),
+				statusColor: '#10b981',
+				easySetup: true
 			},
 			{
 				id: 'sstp',
@@ -87,13 +268,9 @@ return view.extend({
 				port: 'TCP 443 (HTTPS)',
 				crypto: 'TLS 1.2 / 1.3 + MS-CHAPv2',
 				layer: 'Layer 3 PPP Tunnel',
-				status: _('Kernel & Proto Ready'),
+				status: _('Ready to Connect'),
 				statusColor: '#10b981',
-				primaryBtn: {
-					label: _('Create SSTP Interface'),
-					url: L.url('admin/network/network'),
-					class: 'cbi-button cbi-button-neutral'
-				}
+				easySetup: true
 			},
 			{
 				id: 'l2tp',
@@ -104,13 +281,9 @@ return view.extend({
 				port: 'UDP 1701',
 				crypto: 'PPP Encapsulation / CHAP',
 				layer: 'Layer 2 over UDP',
-				status: _('xl2tpd Daemon Ready'),
+				status: _('Ready to Connect'),
 				statusColor: '#10b981',
-				primaryBtn: {
-					label: _('Create L2TP Interface'),
-					url: L.url('admin/network/network'),
-					class: 'cbi-button cbi-button-neutral'
-				}
+				easySetup: true
 			},
 			{
 				id: 'pptp',
@@ -118,16 +291,12 @@ return view.extend({
 				badge: 'Point-to-Point',
 				badgeColor: '#f59e0b',
 				desc: _('Lightweight Point-to-Point Tunneling Protocol client for high-throughput connectivity on low-overhead mobile links and legacy appliances.'),
-				port: 'TCP 1723 + IP GRE (Proto 47)',
+				port: 'TCP 1723 + IP GRE',
 				crypto: 'MPPE 128-bit + MS-CHAPv2',
 				layer: 'Layer 3 GRE / PPP',
-				status: _('kmod-pptp Ready'),
+				status: _('Ready to Connect'),
 				statusColor: '#10b981',
-				primaryBtn: {
-					label: _('Create PPTP Interface'),
-					url: L.url('admin/network/network'),
-					class: 'cbi-button cbi-button-neutral'
-				}
+				easySetup: true
 			}
 		];
 
@@ -140,101 +309,46 @@ return view.extend({
 			E('div', { 'style': 'display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;' }, [
 				E('div', {}, [
 					E('div', { 'style': 'display: flex; align-items: center; gap: 10px; margin-bottom: 6px;' }, [
-						E('span', { 'style': 'font-size: 22px;' }, '🛡️'),
-						E('h2', { 'style': 'margin: 0; font-size: 20px; font-weight: 700; color: var(--proton-fg, #f5f7fa);' }, _('Travel VPN Client Gateway')),
-						E('span', { 'style': 'font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 10px; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);' }, _('5 Protocols Ready'))
+						E('h2', { 'style': 'margin: 0; font-size: 20px; font-weight: 700; color: #fff;' }, _('VPN Client Center')),
+						E('span', { 'style': 'font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 10px; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);' }, _('Plug & Play Ready'))
 					]),
 					E('p', { 'style': 'margin: 0; font-size: 13px; color: var(--text-color-medium, #94a3b8); max-width: 780px; line-height: 1.5;' }, 
-						_('Equipped with 5 enterprise and stealth VPN client suites (OpenVPN, strongSwan IPsec, L2TP, PPTP, and SSTP). Configure client tunnels below to protect mobile internet browsing, encrypt public Wi-Fi traffic, and connect directly to private corporate or home networks.')
+						_('Configure high-speed secure VPN client tunnels directly from this dashboard. Click "Quick Setup" on any protocol to connect in seconds, automatically creating uplink routes and firewall security zones.')
 					)
 				]),
 				E('div', { 'style': 'display: flex; gap: 10px; flex-wrap: wrap;' }, [
 					E('a', {
-						'class': 'cbi-button cbi-button-action',
-						'href': L.url('admin/network/network'),
-						'style': 'font-size: 12px; font-weight: 600; padding: 7px 16px; border-radius: 6px;'
-					}, _('+ Add VPN Interface')),
+						'class': 'cbi-button cbi-button-neutral',
+						'href': L.url('admin/status/wireguard'),
+						'style': 'font-size: 12px; padding: 7px 14px; border-radius: 6px;'
+					}, _('WireGuard Status')),
 					E('a', {
 						'class': 'cbi-button cbi-button-neutral',
-						'href': L.url('admin/status/overview'),
+						'href': L.url('admin/network/network'),
 						'style': 'font-size: 12px; padding: 7px 14px; border-radius: 6px;'
-					}, _('Network Overview'))
+					}, _('All Interfaces'))
 				])
 			])
 		]));
 
-		// Protocol Cards Grid (Responsive 2 columns)
-		var grid = E('div', {
-			'style': 'display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin-bottom: 24px;'
-		});
-
-		protocols.forEach(function(p) {
-			var card = E('div', {
-				'style': 'background: var(--proton-card-bg, rgba(255,255,255,0.03)); border: 1px solid var(--proton-border, rgba(255,255,255,0.08)); border-radius: 10px; padding: 18px 20px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.15);'
-			}, [
-				E('div', {}, [
-					E('div', { 'style': 'display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;' }, [
-						E('div', { 'style': 'display: flex; align-items: center; gap: 8px;' }, [
-							E('h3', { 'style': 'margin: 0; font-size: 16px; font-weight: 600; color: var(--proton-fg, #f5f7fa);' }, p.name),
-							E('span', { 'style': 'font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: ' + p.badgeColor + '22; color: ' + p.badgeColor + '; border: 1px solid ' + p.badgeColor + '44;' }, p.badge)
-						]),
-						E('span', { 'style': 'font-size: 11px; font-weight: 600; color: ' + p.statusColor + '; display: flex; align-items: center; gap: 5px;' }, [
-							E('span', { 'style': 'width: 6px; height: 6px; border-radius: 50%; background: ' + p.statusColor + ';' }),
-							p.status
-						])
-					]),
-					E('p', { 'style': 'margin: 0 0 14px 0; font-size: 12px; color: var(--text-color-medium, #94a3b8); line-height: 1.4;' }, p.desc),
-					E('div', { 'style': 'background: rgba(0,0,0,0.15); border-radius: 6px; padding: 8px 12px; margin-bottom: 16px; font-size: 11px; display: flex; flex-direction: column; gap: 4px;' }, [
-						E('div', { 'style': 'display: flex; justify-content: space-between;' }, [
-							E('span', { 'style': 'color: var(--text-color-medium, #94a3b8);' }, _('Ports:')),
-							E('span', { 'style': 'font-family: monospace; font-weight: 600;' }, p.port)
-						]),
-						E('div', { 'style': 'display: flex; justify-content: space-between;' }, [
-							E('span', { 'style': 'color: var(--text-color-medium, #94a3b8);' }, _('Encapsulation:')),
-							E('span', { 'style': 'font-weight: 500;' }, p.layer)
-						]),
-						E('div', { 'style': 'display: flex; justify-content: space-between;' }, [
-							E('span', { 'style': 'color: var(--text-color-medium, #94a3b8);' }, _('Crypto Ciphers:')),
-							E('span', { 'style': 'font-weight: 500;' }, p.crypto)
-						])
-					])
-				]),
-				E('div', { 'style': 'display: flex; gap: 8px; justify-content: flex-end;' }, [
-					E('a', {
-						'class': p.primaryBtn.class,
-						'href': p.primaryBtn.url,
-						'style': 'font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: 5px; text-decoration: none;'
-					}, p.primaryBtn.label)
-				])
-			]);
-			grid.appendChild(card);
-		});
-
-		container.appendChild(grid);
-
-		// Active VPN Tunnels Section
+		// Active VPN Tunnels Section (Top Priority for End-Users)
 		var tunnelsCard = E('div', {
-			'style': 'background: var(--proton-card-bg, rgba(255,255,255,0.03)); border: 1px solid var(--proton-border, rgba(255,255,255,0.08)); border-radius: 10px; padding: 18px 20px;'
+			'style': 'background: var(--proton-card-bg, rgba(255,255,255,0.03)); border: 1px solid var(--proton-border, rgba(255,255,255,0.08)); border-radius: 10px; padding: 18px 20px; margin-bottom: 24px;'
 		});
 
 		tunnelsCard.appendChild(E('div', { 'style': 'display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;' }, [
 			E('div', {}, [
-				E('h3', { 'style': 'margin: 0 0 4px 0; font-size: 15px; font-weight: 600;' }, _('Active VPN Interfaces & Tunnels')),
-				E('p', { 'style': 'margin: 0; font-size: 12px; color: var(--text-color-medium, #94a3b8);' }, _('Network interfaces currently designated for VPN tunnels and secure uplink routing.'))
-			]),
-			E('a', {
-				'class': 'cbi-button cbi-button-action',
-				'href': L.url('admin/network/network'),
-				'style': 'font-size: 12px; padding: 6px 14px; border-radius: 5px;'
-			}, _('Configure in Interfaces'))
+				E('h3', { 'style': 'margin: 0 0 4px 0; font-size: 15px; font-weight: 600;' }, _('Active VPN Tunnels')),
+				E('p', { 'style': 'margin: 0; font-size: 12px; color: var(--text-color-medium, #94a3b8);' }, _('Connected VPN uplinks routing your network traffic.'))
+			])
 		]));
 
 		if (vpnIfaces.length === 0) {
 			tunnelsCard.appendChild(E('div', {
 				'style': 'padding: 24px; text-align: center; color: var(--text-color-medium, #94a3b8); font-size: 13px; background: rgba(0,0,0,0.1); border-radius: 6px; border: 1px dashed var(--proton-border, rgba(255,255,255,0.1));'
 			}, [
-				E('p', { 'style': 'margin: 0 0 6px 0; font-weight: 600;' }, _('No active VPN client interfaces configured yet.')),
-				E('p', { 'style': 'margin: 0; font-size: 12px;' }, _('Upload an .ovpn file in OpenVPN Manager or create a new interface with protocol PPTP, L2TP, or SSTP under Network > Interfaces.'))
+				E('p', { 'style': 'margin: 0 0 6px 0; font-weight: 600;' }, _('No active VPN connections right now.')),
+				E('p', { 'style': 'margin: 0; font-size: 12px;' }, _('Choose a protocol below and click "Quick Setup" to connect.'))
 			]));
 		} else {
 			var table = E('table', { 'class': 'table', 'style': 'width: 100%; border-collapse: collapse; font-size: 12px;' }, [
@@ -242,7 +356,7 @@ return view.extend({
 					E('th', { 'class': 'th' }, _('Interface')),
 					E('th', { 'class': 'th' }, _('Protocol')),
 					E('th', { 'class': 'th' }, _('Device')),
-					E('th', { 'class': 'th' }, _('IP Address')),
+					E('th', { 'class': 'th' }, _('Assigned IP')),
 					E('th', { 'class': 'th' }, _('Uptime')),
 					E('th', { 'class': 'th', 'style': 'text-align: right;' }, _('Actions'))
 				])
@@ -264,7 +378,7 @@ return view.extend({
 							'class': 'cbi-button cbi-button-neutral',
 							'href': L.url('admin/network/network'),
 							'style': 'font-size: 11px; padding: 3px 8px; border-radius: 4px;'
-						}, _('Edit'))
+						}, _('Settings'))
 					])
 				]);
 				table.appendChild(row);
@@ -274,6 +388,60 @@ return view.extend({
 		}
 
 		container.appendChild(tunnelsCard);
+
+		// Protocol Cards Grid
+		var grid = E('div', {
+			'style': 'display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin-bottom: 24px;'
+		});
+
+		protocols.forEach(function(p) {
+			var card = E('div', {
+				'style': 'background: var(--proton-card-bg, rgba(255,255,255,0.03)); border: 1px solid var(--proton-border, rgba(255,255,255,0.08)); border-radius: 10px; padding: 18px 20px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.15);'
+			}, [
+				E('div', {}, [
+					E('div', { 'style': 'display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;' }, [
+						E('div', { 'style': 'display: flex; align-items: center; gap: 8px;' }, [
+							E('h3', { 'style': 'margin: 0; font-size: 16px; font-weight: 600; color: var(--proton-fg, #f5f7fa);' }, p.name),
+							E('span', { 'style': 'font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: ' + p.badgeColor + '22; color: ' + p.badgeColor + '; border: 1px solid ' + p.badgeColor + '44;' }, p.badge)
+						]),
+						E('span', { 'style': 'font-size: 11px; font-weight: 600; color: ' + p.statusColor + '; display: flex; align-items: center; gap: 5px;' }, [
+							E('span', { 'style': 'width: 6px; height: 6px; border-radius: 50%; background: ' + p.statusColor + ';' }),
+							p.status
+						])
+					]),
+					E('p', { 'style': 'margin: 0 0 14px 0; font-size: 12px; color: var(--text-color-medium, #94a3b8); line-height: 1.4;' }, p.desc),
+					
+					// Accordion for Technical Specs
+					E('details', { 'style': 'margin-bottom: 14px; font-size: 11px; cursor: pointer;' }, [
+						E('summary', { 'style': 'color: var(--proton-accent, #38bdf8); font-weight: 500; outline: none; margin-bottom: 6px;' }, _('View Technical Specs')),
+						E('div', { 'style': 'background: rgba(0,0,0,0.2); border-radius: 6px; padding: 8px 12px; display: flex; flex-direction: column; gap: 4px; margin-top: 4px;' }, [
+							E('div', { 'style': 'display: flex; justify-content: space-between;' }, [
+								E('span', { 'style': 'color: var(--text-color-medium, #94a3b8);' }, _('Port:')),
+								E('span', { 'style': 'font-family: monospace; font-weight: 600;' }, p.port)
+							]),
+							E('div', { 'style': 'display: flex; justify-content: space-between;' }, [
+								E('span', { 'style': 'color: var(--text-color-medium, #94a3b8);' }, _('Encapsulation:')),
+								E('span', { 'style': 'font-weight: 500;' }, p.layer)
+							]),
+							E('div', { 'style': 'display: flex; justify-content: space-between;' }, [
+								E('span', { 'style': 'color: var(--text-color-medium, #94a3b8);' }, _('Cryptography:')),
+								E('span', { 'style': 'font-weight: 500;' }, p.crypto)
+							])
+						])
+					])
+				]),
+				E('div', { 'style': 'display: flex; gap: 8px; justify-content: flex-end;' }, [
+					E('button', {
+						'class': 'cbi-button cbi-button-action',
+						'style': 'font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: 5px;',
+						'click': function() { self.openQuickSetupModal(p.id, p.name); }
+					}, _('⚡ Quick Setup'))
+				])
+			]);
+			grid.appendChild(card);
+		});
+
+		container.appendChild(grid);
 
 		return container;
 	},
