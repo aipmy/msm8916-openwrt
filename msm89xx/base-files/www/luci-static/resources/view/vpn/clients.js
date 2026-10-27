@@ -232,7 +232,8 @@ return view.extend({
 						ui.showModal(null, [ E('p', { 'class': 'spinning' }, _('Saving VPN Interface…')) ]);
 
 						try {
-							uci.set('network', ifname, 'interface');
+							// In LuCI uci.js, a new named section must be created via uci.add(conf, type, name)
+							uci.add('network', 'interface', ifname);
 							uci.set('network', ifname, 'proto', protoId);
 							uci.set('network', ifname, 'server', server);
 							if (protoId === 'sstp') {
@@ -245,7 +246,7 @@ return view.extend({
 								if (clientIp) uci.set('network', ifname, 'addresses', [ clientIp ]);
 
 								if (pubKey) {
-									var peerSec = uci.add('network', 'wireguard_' + ifname);
+									var peerSec = uci.add('network', 'wireguard_' + ifname, 'wgpeer_' + ifname);
 									uci.set('network', peerSec, 'public_key', pubKey);
 									uci.set('network', peerSec, 'route_allowed_ips', '1');
 									uci.set('network', peerSec, 'allowed_ips', allowedIps.split(/\s*,\s*|\s+/));

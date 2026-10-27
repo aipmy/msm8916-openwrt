@@ -9,6 +9,9 @@
 			"uci": [ "network", "openvpn", "firewall" ]
 		},
 		"write": {
+			"ubus": {
+				"uci": [ "add", "apply", "confirm", "delete", "order", "rename", "set" ]
+			},
 			"uci": [ "network", "openvpn", "firewall" ]
 		}
 	}
