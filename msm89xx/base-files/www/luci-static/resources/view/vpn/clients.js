@@ -216,6 +216,19 @@ return view.extend({
 							return;
 						}
 
+						// Read all form inputs before closing/replacing modal DOM
+						var sstpPort = (document.getElementById('vpn_port')?.value || '443').trim();
+						var privKey = (document.getElementById('vpn_privkey')?.value || '').trim();
+						var pubKey = (document.getElementById('vpn_pubkey')?.value || '').trim();
+						var clientIp = (document.getElementById('vpn_client_ip')?.value || '').trim();
+						var allowedIps = (document.getElementById('vpn_allowed_ips')?.value || '0.0.0.0/0').trim();
+
+						var user = (document.getElementById('vpn_username')?.value || '').trim();
+						var pass = (document.getElementById('vpn_password')?.value || '').trim();
+						var keepalive = parseInt(document.getElementById('vpn_keepalive')?.value || '30', 10);
+						var addDefaultRoute = document.getElementById('vpn_defaultroute')?.checked || false;
+						var usePeerDns = document.getElementById('vpn_peerdns')?.checked || false;
+
 						ui.showModal(null, [ E('p', { 'class': 'spinning' }, _('Saving VPN Interface…')) ]);
 
 						try {
@@ -223,17 +236,11 @@ return view.extend({
 							uci.set('network', ifname, 'proto', protoId);
 							uci.set('network', ifname, 'server', server);
 							if (protoId === 'sstp') {
-								var port = (document.getElementById('vpn_port')?.value || '443').trim();
-								uci.set('network', ifname, 'port', port);
+								uci.set('network', ifname, 'port', sstpPort);
 							}
 							uci.set('network', ifname, 'ipv6', '0');
 
 							if (isWireGuard) {
-								var privKey = (document.getElementById('vpn_privkey').value || '').trim();
-								var pubKey = (document.getElementById('vpn_pubkey').value || '').trim();
-								var clientIp = (document.getElementById('vpn_client_ip').value || '').trim();
-								var allowedIps = (document.getElementById('vpn_allowed_ips').value || '0.0.0.0/0').trim();
-
 								if (privKey) uci.set('network', ifname, 'private_key', privKey);
 								if (clientIp) uci.set('network', ifname, 'addresses', [ clientIp ]);
 
@@ -252,12 +259,6 @@ return view.extend({
 									}
 								}
 							} else {
-								var user = (document.getElementById('vpn_username').value || '').trim();
-								var pass = (document.getElementById('vpn_password').value || '').trim();
-								var keepalive = parseInt(document.getElementById('vpn_keepalive').value || '30', 10);
-								var addDefaultRoute = document.getElementById('vpn_defaultroute').checked;
-								var usePeerDns = document.getElementById('vpn_peerdns').checked;
-
 								if (user) uci.set('network', ifname, 'username', user);
 								if (pass) uci.set('network', ifname, 'password', pass);
 								
