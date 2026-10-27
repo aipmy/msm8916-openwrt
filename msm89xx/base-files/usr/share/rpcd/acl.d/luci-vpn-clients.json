@@ -14,7 +14,8 @@
 		"write": {
 			"file": {
 				"/sbin/ifup": [ "exec" ],
-				"/sbin/ifdown": [ "exec" ]
+				"/sbin/ifdown": [ "exec" ],
+				"/sbin/logread": [ "exec" ]
 			},
 			"ubus": {
 				"network.interface": [ "up", "down" ],

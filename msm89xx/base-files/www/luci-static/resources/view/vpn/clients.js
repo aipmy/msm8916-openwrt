@@ -95,9 +95,18 @@ function formatBytes(bytes) {
 	return (bytes / 1073741824).toFixed(2) + ' GB';
 }
 
+function formatSpeed(bytesPerSec) {
+	if (bytesPerSec == null || isNaN(bytesPerSec) || bytesPerSec < 1) return '0 B/s';
+	if (bytesPerSec < 1024) return Math.round(bytesPerSec) + ' B/s';
+	if (bytesPerSec < 1048576) return (bytesPerSec / 1024).toFixed(1) + ' KB/s';
+	return (bytesPerSec / 1048576).toFixed(2) + ' MB/s';
+}
+
 function renderSvgIcon(type) {
 	var svg = '';
-	if (type === 'restart') {
+	if (type === 'log') {
+		svg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>';
+	} else if (type === 'restart') {
 		svg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.19"/></svg>';
 	} else if (type === 'stop') {
 		svg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
@@ -117,14 +126,78 @@ function renderSvgIcon(type) {
 }
 
 return view.extend({
+	prevTraffic: {},
+	lastPollTime: null,
+
 	load: function() {
 		return Promise.all([
 			callNetworkDump(),
 			L.resolveDefault(fs.read_direct('/proc/net/dev'), ''),
 			callServiceList(),
 			uci.load('network'),
-			uci.load('firewall').catch(function() { return null; })
+			uci.load('firewall').catch(function() { return null; }),
+			L.resolveDefault(fs.stat('/usr/sbin/openvpn'), null)
 		]);
+	},
+
+	openLogsModal: function(ifname, proto) {
+		var self = this;
+		var pre = E('pre', {
+			'style': 'margin: 0; padding: 12px 14px; background: #080c14; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; font-family: monospace; font-size: 11px; line-height: 1.45; color: #38bdf8; max-height: 55vh; overflow-y: auto; white-space: pre-wrap; word-break: break-all;'
+		}, [ E('span', { 'class': 'spinning' }, _('Fetching log entries…')) ]);
+
+		var modal = ui.showModal(_('Tunnel Logs: ') + ifname + ' (' + (proto || '').toUpperCase() + ')', [
+			E('div', { 'style': 'font-size: 12px; margin-bottom: 12px; color: var(--text-color-medium, #94a3b8); display: flex; justify-content: space-between; align-items: center;' }, [
+				E('span', {}, _('Recent syslog entries for this interface & daemon.')),
+				E('button', {
+					'class': 'cbi-button cbi-button-neutral',
+					'style': 'font-size: 11px; padding: 3px 8px; border-radius: 4px;',
+					'click': function() { fetchLogs(); }
+				}, _('🔄 Refresh'))
+			]),
+			pre,
+			E('div', { 'class': 'right', 'style': 'margin-top: 16px; display: flex; justify-content: flex-end;' }, [
+				E('button', {
+					'class': 'cbi-button cbi-button-neutral',
+					'click': ui.hideModal
+				}, _('Close'))
+			])
+		]);
+
+		function fetchLogs() {
+			pre.innerHTML = '<span class="spinning">' + _('Loading…') + '</span>';
+			fs.exec_direct('/sbin/logread', [ '-l', '350' ]).then(function(content) {
+				if (!content) {
+					pre.textContent = _('No log output returned from system.');
+					return;
+				}
+				var lines = content.trim().split('\n');
+				var pat = ifname.toLowerCase();
+				var protoPat = (proto || '').toLowerCase();
+
+				var filtered = lines.filter(function(line) {
+					var l = line.toLowerCase();
+					if (l.indexOf(pat) !== -1) return true;
+					if (protoPat === 'sstp' && (l.indexOf('sstp') !== -1 || l.indexOf('pppd') !== -1)) return true;
+					if (protoPat === 'pptp' && (l.indexOf('pptp') !== -1 || l.indexOf('pppd') !== -1)) return true;
+					if (protoPat === 'l2tp' && (l.indexOf('l2tp') !== -1 || l.indexOf('xl2tpd') !== -1 || l.indexOf('pppd') !== -1)) return true;
+					if (protoPat === 'wireguard' && (l.indexOf('wireguard') !== -1 || l.indexOf('wg') !== -1)) return true;
+					if (protoPat === 'openvpn' && l.indexOf('openvpn') !== -1) return true;
+					return false;
+				});
+
+				if (filtered.length === 0) {
+					pre.textContent = _('No recent log entries matching "%s". Tunnel may be idle or logged under different facility.').format(ifname);
+				} else {
+					pre.textContent = filtered.slice(-40).join('\n');
+					pre.scrollTop = pre.scrollHeight;
+				}
+			}).catch(function(err) {
+				pre.textContent = _('Failed to read logs: ') + (err.message || err);
+			});
+		}
+
+		fetchLogs();
 	},
 
 	confirmAction: function(title, message, confirmText, isDanger, onConfirm) {
@@ -824,6 +897,12 @@ return view.extend({
 
 		var devStats = parseDevStats(devStatsText);
 
+		var now = Date.now();
+		var timeDelta = (self.lastPollTime ? (now - self.lastPollTime) / 1000 : 2);
+		if (timeDelta <= 0) timeDelta = 2;
+		self.lastPollTime = now;
+		self.prevTraffic = self.prevTraffic || {};
+
 		// Map active interfaces from netifd dump
 		var dumpMap = {};
 		(ifaces || []).forEach(function(ifc) {
@@ -906,7 +985,25 @@ return view.extend({
 
 			var devName = ifc.l3_device || ifc.device || '';
 			var stats = devStats[devName] || { rx: 0, tx: 0 };
-			var trafficStr = '↓ ' + formatBytes(stats.rx) + ' / ↑ ' + formatBytes(stats.tx);
+
+			// Calculate real-time speed
+			var prev = self.prevTraffic[devName] || stats;
+			var rxSpeed = (isUp && stats.rx >= prev.rx) ? (stats.rx - prev.rx) / timeDelta : 0;
+			var txSpeed = (isUp && stats.tx >= prev.tx) ? (stats.tx - prev.tx) / timeDelta : 0;
+			self.prevTraffic[devName] = { rx: stats.rx, tx: stats.tx };
+
+			var speedStr = '↓ ' + formatSpeed(rxSpeed) + '  ↑ ' + formatSpeed(txSpeed);
+			var totalStr = 'Total: ↓ ' + formatBytes(stats.rx) + ' / ↑ ' + formatBytes(stats.tx);
+
+			// Routing & Peer IP details
+			var isDefRoute = (uci.get('network', ifc.interface, 'defaultroute') === '1');
+			var routeBadgeBg = isDefRoute ? 'rgba(56, 189, 248, 0.12)' : 'rgba(148, 163, 184, 0.08)';
+			var routeBadgeColor = isDefRoute ? '#38bdf8' : '#94a3b8';
+			var routeBadgeBorder = isDefRoute ? 'rgba(56, 189, 248, 0.25)' : 'rgba(148, 163, 184, 0.18)';
+			var routeBadgeLabel = isDefRoute ? 'Default GW' : 'Split Tunnel';
+
+			var peerIp = (ifc['ipv4-address'] && ifc['ipv4-address'][0] && ifc['ipv4-address'][0].ptpaddress) 
+				? ifc['ipv4-address'][0].ptpaddress : '';
 
 			if (row) {
 				var dot = row.querySelector('.vpn-status-dot');
@@ -918,15 +1015,18 @@ return view.extend({
 
 				var ipCell = row.querySelector('.vpn-ip-cell');
 				if (ipCell) {
-					ipCell.textContent = assignedIp;
-					ipCell.style.color = (assignedIp !== '-') ? '#38bdf8' : 'inherit';
+					ipCell.innerHTML = '<span style="color:' + (assignedIp !== '-' ? '#38bdf8' : 'inherit') + ';">' + assignedIp + '</span>' + 
+						(peerIp ? '<div style="font-size:10px;color:var(--text-color-medium,#94a3b8);opacity:0.8;">peer: ' + peerIp + '</div>' : '');
 				}
 
 				var uptimeCell = row.querySelector('.vpn-uptime-cell');
 				if (uptimeCell) uptimeCell.textContent = ifc.uptime ? '%t'.format(ifc.uptime) : '-';
 
 				var trafficCell = row.querySelector('.vpn-traffic-cell');
-				if (trafficCell) trafficCell.textContent = trafficStr;
+				if (trafficCell) {
+					trafficCell.innerHTML = '<div style="font-weight:600;color:' + (isUp ? '#38bdf8' : 'inherit') + ';">' + speedStr + '</div>' +
+						'<div style="font-size:10px;color:var(--text-color-medium,#94a3b8);opacity:0.8;">' + totalStr + '</div>';
+				}
 
 				var toggleBtn = row.querySelector('.btn-toggle');
 				if (toggleBtn) {
@@ -936,17 +1036,31 @@ return view.extend({
 			} else {
 				var newRow = E('tr', { 'class': 'tr vpn-data-row', 'id': rowId, 'style': 'border-bottom: 1px solid rgba(255,255,255,0.04);' }, [
 					E('td', { 'class': 'td', 'style': 'font-weight: 600;' }, [
-						E('span', {
-							'class': 'vpn-status-dot',
-							'title': dotTitle,
-							'style': 'display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: middle; cursor: help; background: ' + dotColor + ';' + (isConnecting ? ' box-shadow: 0 0 6px rgba(245, 158, 11, 0.7);' : (isUp && hasIp ? ' box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);' : ''))
-						}),
-						ifc.interface
+						E('div', { 'style': 'display: flex; align-items: center;' }, [
+							E('span', {
+								'class': 'vpn-status-dot',
+								'title': dotTitle,
+								'style': 'display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: middle; cursor: help; background: ' + dotColor + ';' + (isConnecting ? ' box-shadow: 0 0 6px rgba(245, 158, 11, 0.7);' : (isUp && hasIp ? ' box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);' : ''))
+							}),
+							E('span', {}, ifc.interface)
+						]),
+						E('div', { 'style': 'margin-top: 2px;' }, [
+							E('span', {
+								'class': 'badge',
+								'style': 'font-size: 9px; padding: 0 4px; border-radius: 3px; background: ' + routeBadgeBg + '; color: ' + routeBadgeColor + '; border: 1px solid ' + routeBadgeBorder + ';'
+							}, routeBadgeLabel)
+						])
 					]),
 					E('td', { 'class': 'td', 'style': 'text-transform: uppercase;' }, ifc.proto || '-'),
 					E('td', { 'class': 'td vpn-col-hide-mobile', 'style': 'font-family: monospace;' }, devName || '-'),
-					E('td', { 'class': 'td vpn-ip-cell', 'style': 'font-family: monospace; color: ' + (assignedIp !== '-' ? '#38bdf8' : 'inherit') + ';' }, assignedIp),
-					E('td', { 'class': 'td vpn-traffic-cell', 'style': 'font-family: monospace; font-size: 11px; white-space: nowrap;' }, trafficStr),
+					E('td', { 'class': 'td vpn-ip-cell', 'style': 'font-family: monospace;' }, [
+						E('span', { 'style': 'color: ' + (assignedIp !== '-' ? '#38bdf8' : 'inherit') + ';' }, assignedIp),
+						peerIp ? E('div', { 'style': 'font-size: 10px; color: var(--text-color-medium, #94a3b8); opacity: 0.8;' }, 'peer: ' + peerIp) : ''
+					]),
+					E('td', { 'class': 'td vpn-traffic-cell', 'style': 'font-family: monospace; font-size: 11px; white-space: nowrap;' }, [
+						E('div', { 'style': 'font-weight: 600; color: ' + (isUp ? '#38bdf8' : 'inherit') + ';' }, speedStr),
+						E('div', { 'style': 'font-size: 10px; color: var(--text-color-medium, #94a3b8); opacity: 0.8;' }, totalStr)
+					]),
 					E('td', { 'class': 'td vpn-uptime-cell vpn-col-hide-mobile' }, ifc.uptime ? '%t'.format(ifc.uptime) : '-'),
 					E('td', { 'class': 'td', 'style': 'text-align: right; white-space: nowrap;' }, [
 						// Restart Button (🔄)
@@ -961,6 +1075,12 @@ return view.extend({
 							'title': isUp ? _('Stop interface') : _('Start interface'),
 							'click': function() { self.toggleInterface(ifc.interface, isUp); }
 						}, renderSvgIcon(isUp ? 'stop' : 'start')),
+						// Logs Button (📄)
+						E('button', {
+							'class': 'vpn-action-btn btn-log',
+							'title': _('Tunnel Logs'),
+							'click': function() { self.openLogsModal(ifc.interface, ifc.proto); }
+						}, renderSvgIcon('log')),
 						// Settings Button (⚙️)
 						E('button', {
 							'class': 'vpn-action-btn btn-settings',
@@ -985,71 +1105,68 @@ return view.extend({
 		var devStatsText = data[1] || '';
 		var self = this;
 
+		var hasOpenVPN = !!data[5];
+
 		var protocols = [
 			{
 				id: 'wireguard',
 				name: 'WireGuard',
-				badge: 'Fast & Modern',
-				badgeColor: '#10b981',
-				desc: _('Next-generation, ultra-fast VPN with state-of-the-art cryptography (ChaCha20, Curve25519). Native kernel acceleration with lowest battery and memory overhead.'),
-				port: 'UDP 51820',
-				crypto: 'ChaCha20-Poly1305, Curve25519',
-				layer: 'Layer 3 Kernel Crypto',
-				status: _('Kernel Accelerated'),
-				statusColor: '#10b981',
+				port: '51820 UDP',
+				tag: 'Kernel Fast-Path',
+				crypto: 'ChaCha20-Poly1305',
+				layer: 'Layer 3',
+				desc: _('Ultra-fast kernel-accelerated modern VPN. Lowest CPU and battery overhead for mobile links.'),
+				status: _('Native / Ready'),
+				installed: true,
 				easySetup: true
 			},
 			{
 				id: 'sstp',
 				name: 'SSTP Client',
-				badge: 'Stealth HTTPS 443',
-				badgeColor: '#ec4899',
-				desc: _('Secure Socket Tunneling Protocol encapsulated inside HTTPS port 443. Best protocol for traveling and bypassing strict hotel/airport DPI firewalls.'),
-				port: 'TCP 443 / 4430',
-				crypto: 'TLS 1.2 / 1.3 + MS-CHAPv2',
-				layer: 'Layer 3 PPP Tunnel',
-				status: _('Connected & Ready'),
-				statusColor: '#10b981',
+				port: '443 / 4430 TCP',
+				tag: 'HTTPS Stealth',
+				crypto: 'TLS 1.2/1.3 • MS-CHAPv2',
+				layer: 'Layer 3 PPP',
+				desc: _('Encapsulated inside standard HTTPS 443. Bypasses strict carrier firewalls and airport DPI.'),
+				status: _('Native / Ready'),
+				installed: true,
 				easySetup: true
 			},
 			{
 				id: 'l2tp',
 				name: 'L2TP Client',
-				badge: 'Layer 2 Tunneling',
-				badgeColor: '#06b6d4',
-				desc: _('Native Layer 2 Tunneling Protocol client via xl2tpd daemon. Widely used for branch office interconnects and travel gateway routers.'),
-				port: 'UDP 1701',
-				crypto: 'PPP Encapsulation / CHAP',
+				port: '1701 UDP',
+				tag: 'Layer 2 Tunneling',
+				crypto: 'PPP / CHAP',
 				layer: 'Layer 2 over UDP',
-				status: _('Connected & Ready'),
-				statusColor: '#10b981',
+				desc: _('Layer 2 Tunneling Protocol client via xl2tpd. Native compatibility with MikroTik L2TP dial-out.'),
+				status: _('Native / Ready'),
+				installed: true,
 				easySetup: true
 			},
 			{
 				id: 'pptp',
 				name: 'PPTP Client',
-				badge: 'Point-to-Point',
-				badgeColor: '#f59e0b',
-				desc: _('Lightweight Point-to-Point Tunneling Protocol client for high-throughput connectivity on low-overhead mobile links and legacy appliances.'),
-				port: 'TCP 1723 + IP GRE',
-				crypto: 'MPPE 128-bit + MS-CHAPv2',
+				port: '1723 TCP + GRE',
+				tag: 'Low Overhead',
+				crypto: 'MPPE 128-bit',
 				layer: 'Layer 3 GRE / PPP',
-				status: _('Connected & Ready'),
-				statusColor: '#10b981',
+				desc: _('Lightweight Point-to-Point Tunneling. High throughput on low-spec mobile appliances and legacy routers.'),
+				status: _('Native / Ready'),
+				installed: true,
 				easySetup: true
 			},
 			{
 				id: 'openvpn',
 				name: 'OpenVPN',
-				badge: 'Enterprise Standard',
-				badgeColor: '#8b5cf6',
-				desc: _('Highly configurable SSL/TLS VPN with support for custom profiles, certificates, and UDP/TCP fallbacks.'),
-				port: 'UDP/TCP 1194',
-				crypto: 'AES-256-GCM / TLS',
-				layer: 'Layer 3 TUN / TAP',
-				status: _('Installed'),
-				statusColor: '#8b5cf6',
-				easySetup: false
+				port: '1194 UDP/TCP',
+				tag: 'Custom TLS',
+				crypto: 'AES-GCM / TLS',
+				layer: 'TUN / TAP',
+				desc: _('Enterprise SSL/TLS VPN client. Supports custom certificate bundles and flexible corporate profiles.'),
+				status: hasOpenVPN ? _('Installed') : _('Not Installed'),
+				installed: hasOpenVPN,
+				easySetup: hasOpenVPN
 			}
 		];
 
@@ -1185,47 +1302,37 @@ return view.extend({
 		protocols.forEach(function(p) {
 			var card = E('div', { 'class': 'vpn-proto-card' }, [
 				E('div', {}, [
-					E('div', { 'style': 'display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;' }, [
-						E('div', { 'style': 'display: flex; align-items: center; gap: 5px;' }, [
-							E('h3', { 'style': 'margin: 0; font-size: 14.5px; font-weight: 600; color: var(--proton-fg, #f5f7fa);' }, p.name),
-							E('span', { 'style': 'font-size: 9px; font-weight: 600; padding: 1px 4px; border-radius: 3px; background: ' + p.badgeColor + '22; color: ' + p.badgeColor + '; border: 1px solid ' + p.badgeColor + '44;' }, p.badge)
+					// Card Header
+					E('div', { 'style': 'display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;' }, [
+						E('div', { 'style': 'display: flex; align-items: center; gap: 6px;' }, [
+							E('span', { 'style': 'font-size: 13.5px; font-weight: 600; color: var(--proton-fg, #f5f7fa);' }, p.name),
+							E('span', { 'style': 'font-size: 9.5px; padding: 1px 5px; border-radius: 3px; background: rgba(255,255,255,0.05); color: var(--text-color-medium, #94a3b8); border: 1px solid rgba(255,255,255,0.08); font-family: monospace;' }, p.port)
 						]),
-						E('span', { 'style': 'font-size: 10px; font-weight: 600; color: ' + p.statusColor + '; display: flex; align-items: center; gap: 4px;' }, [
-							E('span', { 'style': 'width: 5px; height: 5px; border-radius: 50%; background: ' + p.statusColor + ';' }),
+						E('span', { 'style': 'font-size: 10px; color: ' + (p.installed ? '#10b981' : '#94a3b8') + '; display: flex; align-items: center; gap: 4px;' }, [
+							E('span', { 'style': 'width: 5px; height: 5px; border-radius: 50%; background: currentColor;' + (p.installed ? ' box-shadow: 0 0 4px #10b981;' : '') }),
 							p.status
 						])
 					]),
-					E('p', { 'style': 'margin: 0 0 8px 0; font-size: 11px; color: var(--text-color-medium, #94a3b8); line-height: 1.35;' }, p.desc),
-					
-					// Accordion for Technical Specs
-					E('details', { 'style': 'margin-bottom: 8px; font-size: 10.5px; cursor: pointer;' }, [
-						E('summary', { 'style': 'color: var(--proton-accent, #38bdf8); font-weight: 500; outline: none; margin-bottom: 4px;' }, _('Technical Specs')),
-						E('div', { 'style': 'background: rgba(0,0,0,0.2); border-radius: 5px; padding: 5px 8px; display: flex; flex-direction: column; gap: 2px; margin-top: 3px;' }, [
-							E('div', { 'style': 'display: flex; justify-content: space-between;' }, [
-								E('span', { 'style': 'color: var(--text-color-medium, #94a3b8);' }, _('Port:')),
-								E('span', { 'style': 'font-family: monospace; font-weight: 600;' }, p.port)
-							]),
-							E('div', { 'style': 'display: flex; justify-content: space-between;' }, [
-								E('span', { 'style': 'color: var(--text-color-medium, #94a3b8);' }, _('Encapsulation:')),
-								E('span', { 'style': 'font-weight: 500;' }, p.layer)
-							]),
-							E('div', { 'style': 'display: flex; justify-content: space-between;' }, [
-								E('span', { 'style': 'color: var(--text-color-medium, #94a3b8);' }, _('Cryptography:')),
-								E('span', { 'style': 'font-weight: 500;' }, p.crypto)
-							])
-						])
+					// Description
+					E('p', { 'style': 'margin: 0 0 10px 0; font-size: 11.5px; color: var(--text-color-medium, #94a3b8); line-height: 1.4;' }, p.desc),
+					// Minimalist specs badges (no accordion)
+					E('div', { 'style': 'display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px;' }, [
+						E('span', { 'style': 'font-size: 9.5px; padding: 1px 5px; border-radius: 3px; background: rgba(56, 189, 248, 0.08); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.2);' }, p.tag),
+						E('span', { 'style': 'font-size: 9.5px; padding: 1px 5px; border-radius: 3px; background: rgba(255,255,255,0.03); color: var(--text-color-medium, #94a3b8); border: 1px solid rgba(255,255,255,0.06);' }, p.crypto),
+						E('span', { 'style': 'font-size: 9.5px; padding: 1px 5px; border-radius: 3px; background: rgba(255,255,255,0.03); color: var(--text-color-medium, #94a3b8); border: 1px solid rgba(255,255,255,0.06);' }, p.layer)
 					])
 				]),
-				E('div', { 'style': 'display: flex; gap: 5px; justify-content: flex-end; margin-top: 6px;' }, [
-					p.easySetup ? E('button', {
+				// Card Footer Action
+				E('div', { 'style': 'display: flex; justify-content: flex-end; margin-top: 4px;' }, [
+					p.installed ? E('button', {
 						'class': 'cbi-button cbi-button-action',
-						'style': 'font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px;',
+						'style': 'font-size: 11px; font-weight: 600; padding: 4px 12px; border-radius: 4px; width: 100%; justify-content: center; display: flex; align-items: center; gap: 4px;',
 						'click': function() { self.openQuickSetupModal(p.id, p.name); }
 					}, _('⚡ Quick Setup')) : E('a', {
 						'class': 'cbi-button cbi-button-neutral',
-						'style': 'font-size: 11px; font-weight: 500; padding: 4px 10px; border-radius: 4px;',
-						'href': L.url('admin/vpn/openvpn')
-					}, _('OpenVPN'))
+						'style': 'font-size: 11px; font-weight: 500; padding: 4px 12px; border-radius: 4px; width: 100%; justify-content: center; display: flex; align-items: center; gap: 4px; text-decoration: none;',
+						'href': L.url('admin/system/package-manager') + '?query=openvpn-openssl'
+					}, _('📦 Install openvpn'))
 				])
 			]);
 			grid.appendChild(card);
