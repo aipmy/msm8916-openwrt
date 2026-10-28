@@ -26,3 +26,9 @@ ghidra_scripts/
 scratch/
 
 flasher/logs/
+flasher/backup/
+flasher/temp/
+
+# macOS metadata
+.DS_Store
+._*

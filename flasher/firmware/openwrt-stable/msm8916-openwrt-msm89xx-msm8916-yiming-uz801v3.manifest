@@ -23,6 +23,7 @@ coreutils-stty - 9.9-r2
 coreutils-truncate - 9.9-r2
 curl - 8.19.0-r2
 dbus - 1.16.2-r4
+dbus-utils - 1.16.2-r4
 diag-bind - 1.0-r2
 diag-efs - 1.0-r1
 diag-logtool - 1.0-r1
@@ -38,7 +39,9 @@ fwtool - 2025.10.03~04cd252e-r1
 getrandom - 2025.10.30~6f78fa49-r1
 glib2 - 2.82.0-r1
 hostapd-common - 2025.08.26~ca266cc2-r1
+htop - 3.5.1-r1
 ip-tiny - 6.18.0-r2
+iperf3 - 3.20-r1
 iw - 6.17-r1
 jansson4 - 2.14.1-r1
 jshn - 2026.06.19~7dd12784-r1
@@ -156,6 +159,7 @@ libfdisk1 - 2.41.5-r1
 libffi - 3.4.7-r1
 libgcc1 - 14.3.0-r5
 libical - 3.0.20-r1
+libiperf3 - 3.20-r1
 libiwinfo-data - 2026.01.14~f5dd57a8-r1
 libiwinfo20230701 - 2026.01.14~f5dd57a8-r1
 libjson-c5 - 0.18-r1
@@ -215,7 +219,7 @@ luci-app-filemanager - 26.180.75667~128a781
 luci-app-firewall - 26.180.75667~128a781
 luci-app-modem-watchdog - 1.0-r1
 luci-app-package-manager - 26.180.75667~128a781
-luci-app-sms-manager - 1.0.9-r20260225
+luci-app-sms - 1.0-r1
 luci-app-ttyd - 26.180.75667~128a781
 luci-app-usb-gadget - 1.0-r1
 luci-app-wol - 26.180.75667~128a781

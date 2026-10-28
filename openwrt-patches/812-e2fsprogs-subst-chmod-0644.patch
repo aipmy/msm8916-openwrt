@@ -1,0 +1,26 @@
+diff --git a/package/utils/e2fsprogs/patches/020-subst-chmod-0644.patch b/package/utils/e2fsprogs/patches/020-subst-chmod-0644.patch
+new file mode 100644
+index 00000000000..7b52c7aab02
+--- /dev/null
++++ b/package/utils/e2fsprogs/patches/020-subst-chmod-0644.patch
+@@ -0,0 +1,20 @@
++--- a/util/subst.c	2026-10-28 03:42:08.659205941 +0000
+++++ b/util/subst.c	2026-10-28 03:42:08.672091998 +0000
++@@ -436,7 +436,7 @@
++ 			}
++ #ifndef _WIN32
++ 			if (ofd >= 0)
++-				(void) fchmod(ofd, 0444);
+++				(void) fchmod(ofd, 0644);
++ #endif
++ 			fclose(out);
++ 			if (unlink(newfn) < 0)
++@@ -446,7 +446,7 @@
++ 				printf("Creating or replacing %s.\n", outfn);
++ #ifndef _WIN32
++ 			if (ofd >= 0)
++-				(void) fchmod(ofd, 0444);
+++				(void) fchmod(ofd, 0644);
++ #endif
++ 			fclose(out);
++ 			if (old)

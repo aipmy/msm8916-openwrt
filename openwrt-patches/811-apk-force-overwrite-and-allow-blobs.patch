@@ -1,6 +1,6 @@
 --- a/package/Makefile
 +++ b/package/Makefile
-@@ -102,7 +102,7 @@ ifneq ($(CONFIG_USE_APK),)
+@@ -102,11 +102,16 @@ ifneq ($(CONFIG_USE_APK),)
  	$(file >$(TMP_DIR)/apk_install_list,\
  	    $(foreach pkg,$(shell cat $(PACKAGE_INSTALL_FILES) 2>/dev/null),$(pkg)$(call GetABISuffix,$(pkg))))
 -	$(call apk,$(TARGET_DIR)) add --no-cache --initdb --no-scripts --arch $(ARCH_PACKAGES) \
@@ -8,6 +8,17 @@
  		--repositories-file /dev/null --repository file://$(PACKAGE_DIR_ALL)/packages.adb \
  		$(if $(CONFIG_SIGNED_PACKAGES),,--allow-untrusted) \
  		$$(cat $(TMP_DIR)/apk_install_list) \
+ 			"base-files=$(shell cat $(STAGING_DIR)/base-files.version)" \
+ 			"libc=$(shell cat $(STAGING_DIR)/libc.version)" \
+ 			"kernel=$(shell cat $(STAGING_DIR)/kernel.version)"
++	- find $(TARGET_DIR) -type d -exec chmod 0755 {} +
++	- chmod 0750 $(TARGET_DIR)/root 2>/dev/null || true
++	- chmod 0700 $(TARGET_DIR)/etc/apk/keys $(TARGET_DIR)/etc/ssl/private 2>/dev/null || true
++	- chmod -R a+rX $(TARGET_DIR)/bin $(TARGET_DIR)/sbin $(TARGET_DIR)/lib $(TARGET_DIR)/usr $(TARGET_DIR)/www $(TARGET_DIR)/etc/config $(TARGET_DIR)/etc/init.d $(TARGET_DIR)/etc/rc.d $(TARGET_DIR)/etc/board.d $(TARGET_DIR)/etc/uci-defaults $(TARGET_DIR)/etc/hotplug.d 2>/dev/null || true
++	- chmod 0644 $(TARGET_DIR)/etc/passwd $(TARGET_DIR)/etc/group $(TARGET_DIR)/etc/hosts $(TARGET_DIR)/etc/fstab $(TARGET_DIR)/etc/banner $(TARGET_DIR)/etc/profile $(TARGET_DIR)/etc/shells $(TARGET_DIR)/etc/services $(TARGET_DIR)/etc/protocols 2>/dev/null || true
++	- chmod 0600 $(TARGET_DIR)/etc/shadow 2>/dev/null || true
+ 
+ 	rm -rf $(TARGET_DIR)/run
 --- a/include/package-pack.mk
 +++ b/include/package-pack.mk
 @@ -282,10 +282,9 @@ ifeq ($(CONFIG_USE_APK),)
