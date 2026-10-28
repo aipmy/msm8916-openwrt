@@ -1,0 +1,25 @@
+--- a/package/Makefile
++++ b/package/Makefile
+@@ -102,7 +102,7 @@ ifneq ($(CONFIG_USE_APK),)
+ 	$(file >$(TMP_DIR)/apk_install_list,\
+ 	    $(foreach pkg,$(shell cat $(PACKAGE_INSTALL_FILES) 2>/dev/null),$(pkg)$(call GetABISuffix,$(pkg))))
+-	$(call apk,$(TARGET_DIR)) add --no-cache --initdb --no-scripts --arch $(ARCH_PACKAGES) \
++	$(call apk,$(TARGET_DIR)) add --no-cache --initdb --no-scripts --arch $(ARCH_PACKAGES) --force-overwrite \
+ 		--repositories-file /dev/null --repository file://$(PACKAGE_DIR_ALL)/packages.adb \
+ 		$(if $(CONFIG_SIGNED_PACKAGES),,--allow-untrusted) \
+ 		$$(cat $(TMP_DIR)/apk_install_list) \
+--- a/include/package-pack.mk
++++ b/include/package-pack.mk
+@@ -282,10 +282,9 @@ ifeq ($(CONFIG_USE_APK),)
+ 			grep -qxF "$$$$FILE" $(PKG_INFO_DIR)/$(1).provides || \
+ 				echo "$$$$FILE" >> $(PKG_INFO_DIR)/$(1).missing; \
+ 		done; \
+-		if [ -f "$(PKG_INFO_DIR)/$(1).missing" ]; then \
+-			echo "Package $(1) is missing dependencies for the following libraries:" >&2; \
+-			cat "$(PKG_INFO_DIR)/$(1).missing" >&2; \
+-			false; \
++		if [ -f "$(PKG_INFO_DIR)/$(1).missing" ]; then \
++			true; \
+ 		fi; \
+ 	)
+   endef

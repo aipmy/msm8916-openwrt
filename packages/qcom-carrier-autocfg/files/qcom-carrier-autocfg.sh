@@ -241,8 +241,10 @@ provision_network() {
 		else
 			uci set network.modem.init_epsbearer="$target_eps"
 		fi
-		uci set network.modem.peerdns='1'
-		uci set network.modem.dns='8.8.8.8 1.1.1.1'
+		uci set network.modem.peerdns='0'
+		uci -q delete network.modem.dns
+		uci add_list network.modem.dns='1.1.1.1'
+		uci add_list network.modem.dns='8.8.8.8'
 		uci set network.modem.allowedmode="$target_allowed"
 		if [ -n "$target_preferred" ]; then
 			uci set network.modem.preferredmode="$target_preferred"
