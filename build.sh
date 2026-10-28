@@ -118,7 +118,7 @@ docker_compose() {
 
 docker_exec() {
     ensure_builder
-    docker_compose exec builder sh -c 'umask 022 && exec "$@"' sh "$@"
+    docker_compose exec builder sh -c 'umask 022 && exec "$@"' sh "$@" 2>&1 | tee -a >(docker exec -i openwrt-builder tee -a /proc/1/fd/1 >/dev/null 2>&1)
 }
 
 run_openwrt_make() {
